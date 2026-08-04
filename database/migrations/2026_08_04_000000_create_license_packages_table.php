@@ -18,7 +18,7 @@ return new class extends Migration
             $table->json('domains')->comment('授权域名');
             $table->timestamp('issued_at')->nullable();
             $table->timestamp('not_before')->nullable();
-            $table->timestamp('expires_at')->index();
+            $table->timestamp('expires_at')->nullable()->index();
             $table->longText('token')->comment('RSA 签名授权包');
             $table->timestamp('revoked_at')->nullable()->index();
             $table->string('revoked_reason')->nullable();
