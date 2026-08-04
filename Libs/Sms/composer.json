@@ -1,0 +1,31 @@
+{
+    "name": "caiyun/sms",
+    "description": "A portable multi-driver SMS component for Laravel 13+.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^13.0",
+        "illuminate/support": "^13.0"
+    },
+    "suggest": {
+        "alibabacloud/dysmsapi-20170525": "Required when using the aliyun driver.",
+        "tencentcloud/tencentcloud-sdk-php": "Required when using the tencent driver."
+    },
+    "autoload": {
+        "psr-4": {
+            "Caiyun\\Sms\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Caiyun\\Sms\\SmsServiceProvider"
+            ],
+            "aliases": {
+                "Sms": "Caiyun\\Sms\\Facades\\Sms"
+            }
+        }
+    },
+    "minimum-stability": "stable"
+}
