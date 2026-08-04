@@ -24,8 +24,8 @@ return new class extends Migration
             $table->string('channel', 50)->comment('安装或发布渠道');
             $table->string('last_ip', 45)->nullable()->comment('最近请求 IP');
             $table->text('user_agent')->nullable()->comment('最近请求 User-Agent');
-            $table->timestamp('first_seen_at')->comment('首次请求时间');
-            $table->timestamp('last_seen_at')->comment('最近请求时间');
+            $table->timestamp('first_seen_at')->nullable()->comment('首次请求时间');
+            $table->timestamp('last_seen_at')->nullable()->comment('最近请求时间');
             $table->timestamps();
 
             $table->index(['client_type', 'app_version']);
@@ -46,7 +46,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('status_code')->comment('HTTP 响应状态码');
             $table->unsignedInteger('duration_ms')->comment('服务端处理耗时，毫秒');
             $table->string('ip', 45)->nullable()->comment('请求 IP');
-            $table->timestamp('requested_at')->comment('请求时间');
+            $table->dateTime('requested_at')->comment('请求时间');
 
             $table->index('request_id');
             $table->index(['user_id', 'requested_at']);

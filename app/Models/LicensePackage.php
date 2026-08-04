@@ -1,0 +1,101 @@
+<?php
+
+namespace App\Models;
+
+use App\Services\LicenseSigner;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
+
+/**
+ * @property int $id
+ * @property string $license_id
+ * @property string $customer
+ * @property string|null $project
+ * @property string $plan
+ * @property list<string> $features
+ * @property list<string> $domains
+ * @property CarbonImmutable $issued_at
+ * @property CarbonImmutable $not_before
+ * @property CarbonImmutable $expires_at
+ * @property string $token
+ * @property CarbonImmutable|null $revoked_at
+ * @property string|null $revoked_reason
+ * @property CarbonImmutable|null $last_verified_at
+ */
+#[Fillable([
+    'license_id', 'customer', 'project', 'plan', 'features', 'domains', 'issued_at',
+    'not_before', 'expires_at', 'token', 'revoked_at', 'revoked_reason', 'last_verified_at',
+])]
+class LicensePackage extends Model
+{
+    public function status(): string
+    {
+        return match (true) {
+            $this->revoked_at !== null => 'revoked',
+            $this->not_before->isFuture() => 'pending',
+            $this->expires_at->isPast() => 'expired',
+            default => 'active',
+        };
+    }
+
+    public function supportsDomain(string $host): bool
+    {
+        $host = strtolower(trim($host));
+
+        foreach ($this->domains as $domain) {
+            $domain = strtolower(trim((string) $domain));
+            if ($domain === $host || (str_starts_with($domain, '*.') && str_ends_with($host, substr($domain, 1)))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return array<string, mixed> */
+    public function claims(): array
+    {
+        return [
+            'license_id' => $this->license_id,
+            'customer' => $this->customer,
+            'plan' => $this->plan,
+            'issued_at' => $this->issued_at->toIso8601String(),
+            'not_before' => $this->not_before->toIso8601String(),
+            'expires_at' => $this->expires_at->toIso8601String(),
+            'features' => $this->features,
+            'domains' => $this->domains,
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (LicensePackage $license): void {
+            if ($license->getAttribute('license_id') === null || $license->getAttribute('license_id') === '') {
+                $license->setAttribute('license_id', 'LIC-'.now()->format('Y').'-'.Str::upper((string) Str::ulid()));
+            }
+            if ($license->getAttribute('issued_at') === null) {
+                $license->setAttribute('issued_at', now());
+            }
+            $claims = ['license_id', 'customer', 'plan', 'issued_at', 'not_before', 'expires_at', 'features', 'domains'];
+            if (! $license->exists || $license->isDirty($claims)) {
+                $license->token = app(LicenseSigner::class)->sign($license->claims());
+            }
+        });
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'features' => 'array',
+            'domains' => 'array',
+            'issued_at' => 'immutable_datetime',
+            'not_before' => 'immutable_datetime',
+            'expires_at' => 'immutable_datetime',
+            'revoked_at' => 'immutable_datetime',
+            'last_verified_at' => 'immutable_datetime',
+        ];
+    }
+}

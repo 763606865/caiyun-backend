@@ -1,6 +1,7 @@
 <?php
 
 use App\Admin\Commands\CreateAdminUser;
+use App\Admin\Commands\GenerateLicenseKeys;
 use App\Exceptions\ApiExceptionRenderer;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RecordClientContext;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         CreateAdminUser::class,
+        GenerateLicenseKeys::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->api(prepend: [

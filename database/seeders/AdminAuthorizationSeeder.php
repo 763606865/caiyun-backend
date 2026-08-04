@@ -33,6 +33,11 @@ class AdminAuthorizationSeeder extends Seeder
             'system-settings.view',
             'system-settings.create',
             'system-settings.update',
+            'licenses.view',
+            'licenses.create',
+            'licenses.update',
+            'licenses.delete',
+            'licenses.revoke',
         ];
 
         foreach ($permissions as $permission) {
