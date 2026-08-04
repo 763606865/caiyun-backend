@@ -1,0 +1,73 @@
+name: Auto-DevOps-Aliyun
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          # 超时时间（Go duration 格式，必须带单位：s/m/h）
+          timeout: 10m
+          script: |
+            set -euo pipefail
+            # ==============================================
+            # 【你只需要修改这一行：你的项目实际目录】
+            PROJECT_DIR="/var/www/caiyun-backend/current"
+            # ==============================================
+
+            # 进入项目目录
+            cd $PROJECT_DIR
+
+            # 清空本地git追踪
+            git checkout .
+
+            # 拉取最新代码（保留本地修改，不会覆盖你的 .env 等配置）
+            git pull origin main --rebase
+
+            # ==================== PHP 项目必备命令 ====================
+            # 如果是 Laravel / ThinkPHP 等框架，取消下面对应命令的注释即可
+
+            # 1. 安装依赖（Composer）
+            composer install --no-dev --optimize-autoloader --no-interaction
+
+            # 2. 前端构建（Filament 需要 Vite 产物）
+            pnpm install && pnpm build
+
+            # 3. 静态资源链接（已存在则跳过）
+            php artisan storage:link || true
+
+            # 4. Laravel 专用：缓存配置、路由（上线必须执行）
+            php artisan optimize:clear
+            php artisan optimize
+
+            # 5. 数据库迁移
+            php artisan migrate
+
+            # 7. 目录权限
+            chown -R www-data:www-data storage bootstrap/cache
+            chmod -R ug+rwx storage bootstrap/cache
+            chmod 600 storage/oauth-private.key storage/oauth-public.key
+
+            # 8. 优雅重启队列（Supervisor 会自动拉起，见 .supervisor/caiyun-backend-horizon.conf）
+            php artisan horizon:terminate || true
+
+            # 9. 重启 PHP-FPM
+            sudo systemctl restart php8.5-fpm
+
+            # 10. 确保 Horizon 进程运行（程序名 = caiyun-backend-horizon，不是 horizon）
+            sudo supervisorctl reread
+            sudo supervisorctl update || true
+            sudo supervisorctl restart caiyun-backend-horizon:* || sudo supervisorctl start caiyun-backend-horizon:* || true
+
+            # 部署完成
+            echo "✅ 部署成功！阿里云ECS项目已更新上线"
