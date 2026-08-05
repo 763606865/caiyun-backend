@@ -3,28 +3,35 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * 系统基础设置。
+ * 系统基础设置表。
  *
- * @property int $id
- * @property string $key
- * @property string $site_name
- * @property string|null $logo
- * @property string|null $favicon
- * @property string|null $customer_service_phone
- * @property string|null $icp_number
- * @property bool $sms_enabled
- * @property bool $registration_enabled
- * @property string|null $default_avatar
- * @property int $upload_max_size_mb
- * @property bool $payment_enabled
- * @property string|null $maintenance_message
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property int $id 设置主键
+ * @property string $key 配置实例标识
+ * @property string $site_name 站点名称
+ * @property string|null $logo 站点 Logo 文件路径
+ * @property string|null $favicon 站点 Favicon 文件路径
+ * @property string|null $customer_service_phone 客服电话
+ * @property string|null $icp_number ICP 备案号
+ * @property bool $sms_enabled 是否启用短信功能
+ * @property bool $registration_enabled 是否开放用户注册
+ * @property string|null $default_avatar 用户默认头像文件路径
+ * @property int $upload_max_size_mb 单文件上传大小限制（MB）
+ * @property bool $payment_enabled 是否启用支付配置
+ * @property string|null $maintenance_message 维护模式提示文案
+ * @property string|null $seo_title SEO 标题
+ * @property string|null $seo_keywords SEO 关键词
+ * @property string|null $seo_description SEO 描述
+ * @property string|null $copyright 版权信息
+ * @property string|null $analytics_code 统计代码
+ * @property Carbon|null $created_at 创建时间
+ * @property Carbon|null $updated_at 更新时间
  */
+#[Table(name: 'system_settings')]
 #[Fillable([
     'site_name', 'logo', 'favicon', 'customer_service_phone', 'icp_number',
     'sms_enabled', 'registration_enabled', 'default_avatar',

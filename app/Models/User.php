@@ -7,7 +7,9 @@ use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,22 +23,25 @@ use Laravel\Sanctum\HasApiTokens;
 /**
  * 用户表
  *
- * @property int $id
- * @property string $uuid
- * @property string|null $real_name
- * @property string|null $nick_name
- * @property string|null $phone
- * @property string|null $avatar
- * @property UserGender|null $gender
- * @property string|null $email
- * @property Carbon|null $email_verified_at
- * @property UserStatus $status
- * @property string $password
- * @property string|null $remember_token
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- * @property Carbon|null $deleted_at
+ * @property int $id 用户主键
+ * @property string $uuid 全局唯一用户标识（UUID v7）
+ * @property string|null $real_name 真实姓名
+ * @property string|null $nick_name 昵称
+ * @property string|null $phone 手机号
+ * @property string|null $avatar 头像文件路径
+ * @property UserGender|null $gender 性别
+ * @property string|null $email 邮箱地址
+ * @property Carbon|null $email_verified_at 邮箱验证时间
+ * @property UserStatus $status 用户状态
+ * @property string $password 登录密码哈希
+ * @property string|null $remember_token 记住登录令牌
+ * @property Carbon|null $created_at 创建时间
+ * @property Carbon|null $updated_at 更新时间
+ * @property Carbon|null $deleted_at 软删除时间
+ * @property-read Collection<int, UserAccount> $accounts 第三方平台账号
+ * @property-read Collection<int, UserDevice> $devices 客户端设备
  */
+#[Table(name: 'users')]
 #[Fillable([
     'real_name',
     'nick_name',

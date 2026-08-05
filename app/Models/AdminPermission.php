@@ -2,8 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Table;
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Permission;
 
+/**
+ * 后台权限表。
+ *
+ * @property int $id 权限主键
+ * @property string $name 权限标识
+ * @property string $guard_name 认证守卫名称
+ * @property Carbon|null $created_at 创建时间
+ * @property Carbon|null $updated_at 更新时间
+ */
+#[Table(name: 'permissions')]
 class AdminPermission extends Permission
 {
     protected $attributes = [
