@@ -1,73 +1,80 @@
-name: Auto-DevOps-Aliyun
+name: Deploy to Aliyun ECS
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+  workflow_dispatch:
+
+# 同一时间只允许一个生产部署运行，避免迁移和构建互相冲突。
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
+    name: Deploy production
     runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
 
     steps:
-      - uses: appleboy/ssh-action@v1.2.0
+      - name: Deploy through SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
+          # ALIYUN_HOST 和 ALIYUN_USER 也可改成固定值或 GitHub Variables；
+          # ALIYUN_SSH_KEY 必须是能够登录 ECS 的私钥，不能提交到仓库。
           host: ${{ secrets.ALIYUN_HOST }}
           username: ${{ secrets.ALIYUN_USER }}
           key: ${{ secrets.ALIYUN_SSH_KEY }}
-          # 超时时间（Go duration 格式，必须带单位：s/m/h）
-          timeout: 10m
+          port: 22
+          timeout: 30s
+          command_timeout: 20m
           script: |
             set -euo pipefail
-            # ==============================================
-            # 【你只需要修改这一行：你的项目实际目录】
-            PROJECT_DIR="/var/www/caiyun-backend/current"
-            # ==============================================
 
-            # 进入项目目录
-            cd $PROJECT_DIR
+            readonly PROJECT_DIR="/var/www/caiyun-backend/current"
 
-            # 清空本地git追踪
-            git checkout .
+            cd "$PROJECT_DIR"
 
-            # 拉取最新代码（保留本地修改，不会覆盖你的 .env 等配置）
-            git pull origin main --rebase
+            # ECS 上的 SSH 公钥已配置成 GitHub Deploy key，因此这里可以拉取私有仓库。
+            # .env 等未被 Git 跟踪的生产文件不会被 reset 删除。
+            git fetch --prune origin main
+            git reset --hard origin/main
 
-            # ==================== PHP 项目必备命令 ====================
-            # 如果是 Laravel / ThinkPHP 等框架，取消下面对应命令的注释即可
+            composer install \
+              --no-dev \
+              --prefer-dist \
+              --optimize-autoloader \
+              --no-interaction
 
-            # 1. 安装依赖（Composer）
-            composer install --no-dev --optimize-autoloader --no-interaction
+            npm ci
+            npm run build
 
-            # 2. 前端构建（Filament 需要 Vite 产物）
-            pnpm install && pnpm build
-
-            # 3. 静态资源链接（已存在则跳过）
             php artisan storage:link || true
-
-            # 4. Laravel 专用：缓存配置、路由（上线必须执行）
             php artisan optimize:clear
+            php artisan migrate --force
             php artisan optimize
 
-            # 5. 数据库迁移
-            php artisan migrate
+            sudo chown -R "$(id -un)":www-data storage bootstrap/cache
+            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+            sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
-            # 7. 目录权限
-            chown -R www-data:www-data storage bootstrap/cache
-            chmod -R ug+rwx storage bootstrap/cache
-            chmod 600 storage/oauth-private.key storage/oauth-public.key
+            if [ -f storage/oauth-private.key ]; then
+              chmod 600 storage/oauth-private.key
+            fi
+            if [ -f storage/oauth-public.key ]; then
+              chmod 600 storage/oauth-public.key
+            fi
 
-            # 8. 优雅重启队列（Supervisor 会自动拉起，见 .supervisor/caiyun-backend-horizon.conf）
             php artisan horizon:terminate || true
-
-            # 9. 重启 PHP-FPM
-            sudo systemctl restart php8.5-fpm
-
-            # 10. 确保 Horizon 进程运行（程序名 = caiyun-backend-horizon，不是 horizon）
+            sudo systemctl reload php8.5-fpm
             sudo supervisorctl reread
-            sudo supervisorctl update || true
-            sudo supervisorctl restart caiyun-backend-horizon:* || sudo supervisorctl start caiyun-backend-horizon:* || true
+            sudo supervisorctl update
+            sudo supervisorctl restart 'caiyun-backend-horizon:*' || \
+              sudo supervisorctl start 'caiyun-backend-horizon:*'
 
-            # 部署完成
-            echo "✅ 部署成功！阿里云ECS项目已更新上线"
+            echo "Deployment completed: $(git rev-parse --short HEAD)"
