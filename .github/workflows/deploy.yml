@@ -76,5 +76,7 @@ jobs:
             sudo supervisorctl update
             sudo supervisorctl restart 'caiyun-backend-horizon:*' || \
               sudo supervisorctl start 'caiyun-backend-horizon:*'
+            sudo supervisorctl restart 'caiyun-backend-octane:*' || \
+              sudo supervisorctl start 'caiyun-backend-octane:*'
 
             echo "Deployment completed: $(git rev-parse --short HEAD)"
