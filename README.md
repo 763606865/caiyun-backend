@@ -162,7 +162,7 @@ php artisan migrate
 ```bash
 supervisorctl reread
 supervisorctl update
-supervisorctl restart newpr-backend-horizon:
+supervisorctl restart caiyun-backend-horizon:
 supervisorctl status
 ```
 
