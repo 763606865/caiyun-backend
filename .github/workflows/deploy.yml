@@ -58,6 +58,7 @@ jobs:
             php artisan optimize:clear
             php artisan migrate --force
             php artisan optimize
+            php artisan db:seed --force --class=AdminAuthorizationSeeder
 
             sudo chown -R "$(id -un)":www-data storage bootstrap/cache
             sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
