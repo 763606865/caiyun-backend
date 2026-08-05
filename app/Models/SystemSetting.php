@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
     'site_name', 'logo', 'favicon', 'customer_service_phone', 'icp_number',
     'sms_enabled', 'registration_enabled', 'default_avatar',
     'upload_max_size_mb', 'payment_enabled', 'maintenance_message',
+    'seo_title', 'seo_keywords', 'seo_description', 'copyright', 'analytics_code',
 ])]
 class SystemSetting extends Model
 {

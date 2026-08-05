@@ -25,6 +25,11 @@ return new class extends Migration
             $table->unsignedInteger('upload_max_size_mb')->default(10)->comment('单文件上传大小限制，单位 MB');
             $table->boolean('payment_enabled')->default(false)->comment('是否启用支付配置');
             $table->text('maintenance_message')->nullable()->comment('维护模式提示文案');
+            $table->string('seo_title')->nullable();
+            $table->string('seo_keywords', 500)->nullable();
+            $table->string('seo_description', 500)->nullable();
+            $table->string('copyright')->nullable();
+            $table->string('analytics_code', 2000)->nullable();
             $table->timestamps();
         });
     }

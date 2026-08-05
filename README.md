@@ -13,6 +13,9 @@
 - ElasticSearch >= 9.0
 
 ## 快速初始化
+
+CMS 项目完成依赖和环境变量配置后，推荐执行 `php artisan cms:install`。详细功能和 API 见 [CMS 使用说明](docs/Api/CMS.md)。
+
 ### 1) 配置 Laravel 目录权限
 
 Laravel 运行时需要 Web/PHP 进程能够写入 `bootstrap/cache` 和 `storage`。在 Linux 服务器上，先将目录所属组改为 PHP-FPM/Web 服务使用的用户组（Debian/Ubuntu 通常为 `www-data`，CentOS/RHEL 可能为 `nginx` 或 `apache`）：

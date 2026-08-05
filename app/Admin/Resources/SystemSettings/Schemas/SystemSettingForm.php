@@ -79,6 +79,11 @@ class SystemSettingForm
                     ->placeholder('系统维护期间向用户展示的提示文案')
                     ->rows(5)
                     ->columnSpanFull(),
+                TextInput::make('seo_title')->label('SEO 默认标题')->maxLength(255),
+                TextInput::make('seo_keywords')->label('SEO 默认关键词')->maxLength(500),
+                Textarea::make('seo_description')->label('SEO 默认描述')->rows(3)->columnSpanFull(),
+                TextInput::make('copyright')->label('版权信息')->maxLength(255),
+                Textarea::make('analytics_code')->label('统计代码')->helperText('仅保存统计平台标识或配置，前台输出时请勿直接信任 HTML。')->columnSpanFull(),
             ]);
     }
 }

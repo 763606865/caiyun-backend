@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Category;
+use App\Models\Content;
+use App\Models\Media;
+use App\Models\SystemSetting;
+use App\Models\Tag;
+use App\Observers\CmsAuditObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        foreach ([Content::class, Category::class, Tag::class, Media::class, SystemSetting::class] as $model) {
+            $model::observe(CmsAuditObserver::class);
+        }
     }
 
     /**

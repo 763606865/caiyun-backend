@@ -1,6 +1,7 @@
 <?php
 
 use App\Admin\Commands\CreateAdminUser;
+use App\Admin\Commands\InstallCms;
 use App\Admin\Commands\GenerateLicenseKeys;
 use App\Exceptions\ApiExceptionRenderer;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         CreateAdminUser::class,
+        InstallCms::class,
         GenerateLicenseKeys::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
