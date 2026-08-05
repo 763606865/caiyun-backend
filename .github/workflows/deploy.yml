@@ -40,6 +40,22 @@ jobs:
 
             cd "$PROJECT_DIR"
 
+            # Vite 构建时 Wayfinder 会重新生成这些已被 Git 跟踪的源码目录。
+            # 无论后续命令成功还是失败，都恢复生成文件，避免污染服务器工作区。
+            cleanup_generated_sources() {
+              git restore --source=HEAD --worktree -- \
+                resources/js/actions \
+                resources/js/routes \
+                resources/js/wayfinder
+
+              # 删除构建期间新增、但当前提交中不存在的 Wayfinder 文件。
+              git clean -fd -- \
+                resources/js/actions \
+                resources/js/routes \
+                resources/js/wayfinder
+            }
+            trap cleanup_generated_sources EXIT
+
             # ECS 上的 SSH 公钥已配置成 GitHub Deploy key，因此这里可以拉取私有仓库。
             # .env 等未被 Git 跟踪的生产文件不会被 reset 删除。
             git fetch --prune origin main
@@ -53,6 +69,18 @@ jobs:
 
             npm ci
             npm run build
+
+            # public/build 已被 .gitignore 忽略；恢复的只是 Wayfinder 源码，
+            # 不会影响刚生成的生产构建产物。
+            cleanup_generated_sources
+
+            # npm ci 和构建流程都不应修改任何已跟踪文件。发现异常时立即终止部署，
+            # 并输出具体文件，避免把脏工作区留给下一次发布。
+            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+              git status --short --untracked-files=no
+              echo "Deployment aborted: tracked files were modified during build." >&2
+              exit 1
+            fi
 
             php artisan storage:link || true
             php artisan optimize:clear
@@ -80,4 +108,5 @@ jobs:
             sudo supervisorctl restart 'caiyun-backend-octane:*' || \
               sudo supervisorctl start 'caiyun-backend-octane:*'
 
+            trap - EXIT
             echo "Deployment completed: $(git rev-parse --short HEAD)"
