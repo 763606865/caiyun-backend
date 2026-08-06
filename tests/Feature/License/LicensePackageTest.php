@@ -3,7 +3,11 @@
 namespace Tests\Feature\License;
 
 use App\Models\LicensePackage;
+use App\Models\OpenApiCredential;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class LicensePackageTest extends TestCase
@@ -41,8 +45,9 @@ class LicensePackageTest extends TestCase
     {
         $license = $this->license();
         $instanceId = '550e8400-e29b-41d4-a716-446655440000';
+        $this->flushHeaders();
 
-        $response = $this->postJson('/api/v1/leases', [
+        $response = $this->postEncrypted([
             'license' => $license->token,
             'license_id' => $license->license_id,
             'instance_id' => $instanceId,
@@ -50,13 +55,19 @@ class LicensePackageTest extends TestCase
             'project' => 'cms',
         ])->assertOk();
 
-        [$payload, $signature] = explode('.', $response->json('lease'), 2);
+        [$payload, $signature] = explode('.', $response->json('data.lease'), 2);
         self::assertSame(1, openssl_verify($payload, $this->decode($signature), $this->publicKey, OPENSSL_ALGO_SHA256));
         $claims = json_decode($this->decode($payload), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($license->license_id, $claims['license_id']);
         self::assertSame($instanceId, $claims['instance_id']);
         self::assertSame('example.com', $claims['domain']);
         self::assertSame(['payment', 'ai'], $claims['features']);
+        self::assertTrue(CarbonImmutable::parse($claims['issued_at'])->lessThanOrEqualTo(now()));
+        self::assertSame(
+            72,
+            (int) CarbonImmutable::parse($claims['issued_at'])->diffInHours(CarbonImmutable::parse($claims['expires_at'])),
+        );
+        self::assertNotNull($license->fresh()->last_verified_at);
     }
 
     public function test_revoked_package_is_rejected_by_remote_endpoint(): void
@@ -64,13 +75,55 @@ class LicensePackageTest extends TestCase
         $license = $this->license();
         $license->forceFill(['revoked_at' => now(), 'revoked_reason' => '合同终止'])->saveQuietly();
 
-        $this->postJson('/api/v1/leases', [
+        $this->postEncrypted([
             'license' => $license->token,
             'license_id' => $license->license_id,
             'instance_id' => '550e8400-e29b-41d4-a716-446655440000',
             'domain' => 'example.com',
             'project' => 'cms',
-        ])->assertForbidden()->assertJson(['reason' => 'revoked', 'message' => '合同终止']);
+        ])->assertForbidden()->assertJson(['code' => 403, 'reason' => 'revoked', 'message' => '合同终止']);
+    }
+
+    public function test_remote_endpoint_rejects_a_domain_outside_the_license(): void
+    {
+        $license = $this->license();
+
+        $this->postEncrypted([
+            'license' => $license->token,
+            'license_id' => $license->license_id,
+            'instance_id' => '550e8400-e29b-41d4-a716-446655440000',
+            'domain' => 'unauthorized.example.net',
+            'project' => 'cms',
+        ])->assertForbidden()->assertJson([
+            'reason' => 'domain_mismatch',
+            'message' => '当前域名未获得授权',
+        ]);
+    }
+
+    public function test_remote_endpoint_validates_the_client_protocol(): void
+    {
+        $this->postEncrypted([])
+            ->assertUnprocessable()
+            ->assertJsonPath('code', 422)
+            ->assertJsonMissingPath('lease');
+    }
+
+    public function test_remote_endpoint_rejects_an_invalid_signature(): void
+    {
+        $this->postEncrypted([], signature: 'invalid')
+            ->assertUnauthorized()
+            ->assertJson(['reason' => 'invalid_signature']);
+    }
+
+    public function test_remote_endpoint_rejects_a_replayed_nonce(): void
+    {
+        $credential = OpenApiCredential::query()->create(['name' => '测试调用方']);
+        $nonce = (string) Str::uuid();
+
+        $this->postEncrypted([], $credential, $nonce)->assertUnprocessable();
+        $this->postEncrypted([], $credential, $nonce)
+            ->assertConflict()
+            ->assertJson(['reason' => 'replayed_request']);
     }
 
     private function license(): LicensePackage
@@ -89,5 +142,56 @@ class LicensePackageTest extends TestCase
     private function decode(string $value): string
     {
         return (string) base64_decode(strtr($value, '-_', '+/').str_repeat('=', (4 - strlen($value) % 4) % 4), true);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function postEncrypted(
+        array $payload,
+        ?OpenApiCredential $credential = null,
+        ?string $nonce = null,
+        ?string $signature = null,
+    ): TestResponse {
+        $credential ??= OpenApiCredential::query()->create(['name' => '测试调用方']);
+        $timestamp = (string) now()->timestamp;
+        $nonce ??= (string) Str::uuid();
+        $aad = implode("\n", [$credential->client_id, $timestamp, $nonce]);
+        $iv = random_bytes(12);
+        $plaintext = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $ciphertext = openssl_encrypt(
+            $plaintext,
+            'aes-256-gcm',
+            hash_hkdf('sha256', $credential->client_secret, 32, 'caiyun-openapi-encryption-v1'),
+            OPENSSL_RAW_DATA,
+            $iv,
+            $tag,
+            $aad,
+        );
+        self::assertIsString($ciphertext);
+        $envelope = json_encode([
+            'ciphertext' => $this->encode($ciphertext),
+            'iv' => $this->encode($iv),
+            'tag' => $this->encode($tag),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $canonical = implode("\n", ['POST', '/openapi/v1/leases', $timestamp, $nonce, hash('sha256', $envelope)]);
+        $signature ??= $this->encode(hash_hmac(
+            'sha256',
+            $canonical,
+            hash_hkdf('sha256', $credential->client_secret, 32, 'caiyun-openapi-signing-v1'),
+            true,
+        ));
+
+        return $this->call('POST', '/openapi/v1/leases', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_X_OPENAPI_CLIENT_ID' => $credential->client_id,
+            'HTTP_X_OPENAPI_TIMESTAMP' => $timestamp,
+            'HTTP_X_OPENAPI_NONCE' => $nonce,
+            'HTTP_X_OPENAPI_SIGNATURE' => $signature,
+        ], content: $envelope);
+    }
+
+    private function encode(string $value): string
+    {
+        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
     }
 }
