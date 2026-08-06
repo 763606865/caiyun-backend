@@ -1,6 +1,7 @@
 <?php
 
 use App\Admin\Commands\CreateAdminUser;
+use App\Admin\Commands\DetectAbnormalLicenseHeartbeats;
 use App\Admin\Commands\GenerateLicenseKeys;
 use App\Admin\Commands\InstallCms;
 use App\Exceptions\ApiExceptionRenderer;
@@ -28,12 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
         CreateAdminUser::class,
         InstallCms::class,
         GenerateLicenseKeys::class,
+        DetectAbnormalLicenseHeartbeats::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->trustProxies(at: [
-            '127.0.0.1',
-            '::1',
-        ]);
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'openapi.auth' => VerifyEncryptedOpenApiRequest::class,
         ]);

@@ -6,6 +6,7 @@ use App\Services\LicenseSigner;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 /**
@@ -23,13 +24,43 @@ use Illuminate\Support\Str;
  * @property CarbonImmutable|null $revoked_at
  * @property string|null $revoked_reason
  * @property CarbonImmutable|null $last_verified_at
+ * @property CarbonImmutable|null $heartbeat_abnormal_notified_at
  */
 #[Fillable([
     'license_id', 'customer', 'project', 'plan', 'features', 'domains', 'issued_at',
     'not_before', 'expires_at', 'token', 'revoked_at', 'revoked_reason', 'last_verified_at',
+    'heartbeat_abnormal_notified_at',
 ])]
 class LicensePackage extends Model
 {
+    /** @return HasMany<LicenseInstance, $this> */
+    public function instances(): HasMany
+    {
+        return $this->hasMany(LicenseInstance::class);
+    }
+
+    /** @return HasMany<LicenseVerificationLog, $this> */
+    public function verificationLogs(): HasMany
+    {
+        return $this->hasMany(LicenseVerificationLog::class);
+    }
+
+    public function heartbeatStatus(): string
+    {
+        if ($this->revoked_at !== null || $this->expires_at->isPast()) {
+            return 'inactive';
+        }
+        if ($this->last_verified_at === null) {
+            return $this->not_before->addDays((int) config('licensing.heartbeat_abnormal_days', 7))->isPast()
+                ? 'never_verified'
+                : 'pending';
+        }
+
+        return $this->last_verified_at->addDays((int) config('licensing.heartbeat_abnormal_days', 7))->isPast()
+            ? 'abnormal'
+            : 'normal';
+    }
+
     public function status(): string
     {
         return match (true) {
@@ -96,6 +127,7 @@ class LicensePackage extends Model
             'expires_at' => 'immutable_datetime',
             'revoked_at' => 'immutable_datetime',
             'last_verified_at' => 'immutable_datetime',
+            'heartbeat_abnormal_notified_at' => 'immutable_datetime',
         ];
     }
 }

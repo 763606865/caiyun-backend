@@ -163,6 +163,7 @@ php artisan migrate
 supervisorctl reread
 supervisorctl update
 supervisorctl restart caiyun-backend-horizon:
+supervisorctl restart caiyun-backend-octane:
 supervisorctl status
 ```
 

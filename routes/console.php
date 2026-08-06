@@ -4,6 +4,8 @@ use App\Enums\ContentStatus;
 use App\Models\Content;
 use Illuminate\Support\Facades\Schedule;
 
+Schedule::command('license:detect-abnormal')->dailyAt('02:00')->withoutOverlapping()->onOneServer();
+
 Schedule::call(function (): void {
     Content::query()->where('status', ContentStatus::Pending)->whereNotNull('published_at')->where('published_at', '<=', now())
         ->each(fn (Content $content) => $content->publish());

@@ -11,6 +11,6 @@ OpenAPI 面向甲方及合作方的服务端应用，不适合在浏览器、App
 
 ## 接口
 
-- [授权校验](授权校验.md)：`POST /openapi/v1/leases`
+- [授权校验](授权校验.md)：`POST /openapi/v1/leases/valid`
 
 所有接口必须使用 HTTPS。`Client Secret` 泄露后应立即在后台轮换，旧密钥会即时失效。

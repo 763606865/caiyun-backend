@@ -31,6 +31,16 @@ class LicensePackagesTable
                     }),
                 TextColumn::make('expires_at')->label('到期时间')->dateTime()->sortable(),
                 TextColumn::make('last_verified_at')->label('最后在线校验')->dateTime()->placeholder('从未')->toggleable(),
+                TextColumn::make('heartbeat_status')->label('心跳状态')
+                    ->state(fn (LicensePackage $record): string => $record->heartbeatStatus())
+                    ->badge()->formatStateUsing(fn (string $state): string => match ($state) {
+                        'normal' => '正常', 'pending' => '等待首次验证', 'never_verified' => '从未验证',
+                        'abnormal' => '超过 7 天未验证', 'inactive' => '已过期/撤销', default => $state,
+                    })->color(fn (string $state): string => match ($state) {
+                        'normal' => 'success', 'pending' => 'warning', 'never_verified', 'abnormal' => 'danger',
+                        default => 'gray',
+                    }),
+                TextColumn::make('instances_count')->counts('instances')->label('部署实例')->badge(),
             ])
             ->filters([
                 SelectFilter::make('project')->label('项目')->options(fn (): array => LicensePackage::query()->whereNotNull('project')->distinct()->pluck('project', 'project')->all()),

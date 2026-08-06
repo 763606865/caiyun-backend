@@ -5,6 +5,8 @@ namespace App\Admin\Resources\LicensePackages;
 use App\Admin\Resources\LicensePackages\Pages\CreateLicensePackage;
 use App\Admin\Resources\LicensePackages\Pages\EditLicensePackage;
 use App\Admin\Resources\LicensePackages\Pages\ListLicensePackages;
+use App\Admin\Resources\LicensePackages\RelationManagers\InstancesRelationManager;
+use App\Admin\Resources\LicensePackages\RelationManagers\VerificationLogsRelationManager;
 use App\Admin\Resources\LicensePackages\Schemas\LicensePackageForm;
 use App\Admin\Resources\LicensePackages\Tables\LicensePackagesTable;
 use App\Models\LicensePackage;
@@ -48,6 +50,14 @@ class LicensePackageResource extends Resource
             'index' => ListLicensePackages::route('/'),
             'create' => CreateLicensePackage::route('/create'),
             'edit' => EditLicensePackage::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            InstancesRelationManager::class,
+            VerificationLogsRelationManager::class,
         ];
     }
 }

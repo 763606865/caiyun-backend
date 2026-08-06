@@ -4,6 +4,7 @@ namespace App\OpenApi\Controllers;
 
 use App\Models\LicensePackage;
 use App\Services\LicenseSigner;
+use App\Services\LicenseVerificationRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +20,7 @@ class LicenseLeaseController extends Controller
      * @return JsonResponse
      * @throws \Exception
      */
-    public function valid(Request $request, LicenseSigner $signer): JsonResponse
+    public function valid(Request $request, LicenseSigner $signer, LicenseVerificationRecorder $recorder): JsonResponse
     {
         /** @var array{license: string, license_id: string, instance_id: string, domain: string, project?: string|null, app_version?: string|null} $data */
         $data = $request->validate([
@@ -35,21 +36,21 @@ class LicenseLeaseController extends Controller
         $license = LicensePackage::query()->where('license_id', $data['license_id'])->first();
 
         if (! $license || ! hash_equals($license->token, $data['license'])) {
-            return $this->reject('invalid', '授权证书无效');
+            return $this->reject($recorder, $request, $data, $license, 'invalid', '授权证书无效');
         }
 
         // 撤销优先于有效期判断，以便客户端获得明确且不可离线降级的状态。
         if ($license->revoked_at !== null) {
-            return $this->reject('revoked', $license->revoked_reason ?: '授权已撤销');
+            return $this->reject($recorder, $request, $data, $license, 'revoked', $license->revoked_reason ?: '授权已撤销');
         }
         if ($license->not_before->isFuture() || $license->expires_at->isPast()) {
-            return $this->reject('invalid_period', '授权不在有效期内');
+            return $this->reject($recorder, $request, $data, $license, 'invalid_period', '授权不在有效期内');
         }
         if (! $license->supportsDomain($data['domain'])) {
-            return $this->reject('domain_mismatch', '当前域名未获得授权');
+            return $this->reject($recorder, $request, $data, $license, 'domain_mismatch', '当前域名未获得授权');
         }
         if ($license->project !== null && $license->project !== ($data['project'] ?? null)) {
-            return $this->reject('project_mismatch', '授权项目不匹配');
+            return $this->reject($recorder, $request, $data, $license, 'project_mismatch', '授权项目不匹配');
         }
 
         $issuedAt = now();
@@ -68,8 +69,7 @@ class LicenseLeaseController extends Controller
             'features' => $license->features,
         ]);
 
-        // 该字段仅记录在线校验情况，不触发模型重新签发授权包。
-        $license->forceFill(['last_verified_at' => $issuedAt])->saveQuietly();
+        $recorder->success($license, $data, $request);
 
         return $this->success(['lease' => $signedLease]);
     }
@@ -77,8 +77,17 @@ class LicenseLeaseController extends Controller
     /**
      * 返回统一的授权拒绝响应，同时保留供客户端程序判断的 reason 机器码。
      */
-    private function reject(string $reason, string $message): JsonResponse
-    {
+    /** @param array{license_id: string, instance_id: string, domain: string, project?: string|null, app_version?: string|null} $data */
+    private function reject(
+        LicenseVerificationRecorder $recorder,
+        Request $request,
+        array $data,
+        ?LicensePackage $license,
+        string $reason,
+        string $message,
+    ): JsonResponse {
+        $recorder->rejected($license, $data, $request, $reason);
+
         return $this->error($message, 403, reason: $reason);
     }
 }

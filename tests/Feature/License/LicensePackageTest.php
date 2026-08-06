@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\License;
 
+use App\Models\LicenseInstance;
 use App\Models\LicensePackage;
+use App\Models\LicenseVerificationLog;
 use App\Models\OpenApiCredential;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,6 +70,16 @@ class LicensePackageTest extends TestCase
             (int) CarbonImmutable::parse($claims['issued_at'])->diffInHours(CarbonImmutable::parse($claims['expires_at'])),
         );
         self::assertNotNull($license->fresh()->last_verified_at);
+        self::assertDatabaseHas(LicenseInstance::class, [
+            'license_package_id' => $license->id,
+            'instance_id' => $instanceId,
+            'status' => 'active',
+        ]);
+        self::assertDatabaseHas(LicenseVerificationLog::class, [
+            'license_package_id' => $license->id,
+            'instance_id' => $instanceId,
+            'result' => 'success',
+        ]);
     }
 
     public function test_revoked_package_is_rejected_by_remote_endpoint(): void
@@ -97,6 +109,11 @@ class LicensePackageTest extends TestCase
         ])->assertForbidden()->assertJson([
             'reason' => 'domain_mismatch',
             'message' => '当前域名未获得授权',
+        ]);
+        self::assertDatabaseHas(LicenseVerificationLog::class, [
+            'license_package_id' => $license->id,
+            'result' => 'rejected',
+            'reason' => 'domain_mismatch',
         ]);
     }
 
@@ -172,7 +189,7 @@ class LicensePackageTest extends TestCase
             'iv' => $this->encode($iv),
             'tag' => $this->encode($tag),
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-        $canonical = implode("\n", ['POST', '/openapi/v1/leases', $timestamp, $nonce, hash('sha256', $envelope)]);
+        $canonical = implode("\n", ['POST', '/openapi/v1/leases/valid', $timestamp, $nonce, hash('sha256', $envelope)]);
         $signature ??= $this->encode(hash_hmac(
             'sha256',
             $canonical,
@@ -180,7 +197,7 @@ class LicensePackageTest extends TestCase
             true,
         ));
 
-        return $this->call('POST', '/openapi/v1/leases', server: [
+        return $this->call('POST', '/openapi/v1/leases/valid', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json',
             'HTTP_X_OPENAPI_CLIENT_ID' => $credential->client_id,
