@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('project', 100)->nullable();
             $table->string('app_version', 50)->nullable();
             $table->string('status', 20)->default('active')->index();
-            $table->timestamp('first_verified_at');
-            $table->timestamp('last_verified_at')->index();
+            $table->timestamp('first_verified_at')->nullable();
+            $table->timestamp('last_verified_at')->nullable()->index();
             $table->ipAddress('last_ip')->nullable();
             $table->timestamp('abnormal_notified_at')->nullable();
             $table->timestamps();
@@ -43,7 +43,7 @@ return new class extends Migration
             $table->string('result', 20)->index();
             $table->string('reason', 50)->nullable()->index();
             $table->ipAddress('ip')->nullable();
-            $table->timestamp('verified_at')->index();
+            $table->timestamp('verified_at')->nullable()->index();
             $table->timestamps();
 
             $table->index(['license_package_id', 'verified_at']);
