@@ -20,6 +20,7 @@ class LicensePackagesTable
                 TextColumn::make('license_id')->label('授权编号')->searchable()->copyable(),
                 TextColumn::make('customer')->label('客户')->searchable(),
                 TextColumn::make('project')->label('项目')->placeholder('不限')->searchable(),
+                TextColumn::make('openApiCredential.client_id')->label('Client ID')->placeholder('未绑定')->toggleable()->copyable(),
                 TextColumn::make('plan')->label('套餐')->badge(),
                 TextColumn::make('status')->label('状态')->state(fn (LicensePackage $record): string => $record->status())
                     ->badge()->formatStateUsing(fn (string $state): string => match ($state) {
@@ -46,10 +47,19 @@ class LicensePackagesTable
                 SelectFilter::make('project')->label('项目')->options(fn (): array => LicensePackage::query()->whereNotNull('project')->distinct()->pluck('project', 'project')->all()),
             ])
             ->recordActions([
-                Action::make('download')->label('下载')->icon('heroicon-o-arrow-down-tray')
-                    ->authorize('view')->action(fn (LicensePackage $record) => response()->streamDownload(
-                        fn () => print ($record->token), $record->license_id.'.license', ['Content-Type' => 'text/plain; charset=UTF-8']
-                    )),
+                Action::make('download')->label('下载授权书')->icon('heroicon-o-arrow-down-tray')
+                    ->authorize('view')
+                    ->action(function (LicensePackage $record) {
+                        $record->loadMissing('openApiCredential');
+                        // 确保下载内容含最新 OpenAPI 凭据与核验端点。
+                        $record->resignCertificate();
+
+                        return response()->streamDownload(
+                            fn () => print ($record->token),
+                            $record->license_id.'.license',
+                            ['Content-Type' => 'application/x-caiyun-license; charset=UTF-8'],
+                        );
+                    }),
                 Action::make('revoke')->label('撤销')->icon('heroicon-o-no-symbol')->color('danger')
                     ->visible(fn (LicensePackage $record): bool => $record->revoked_at === null && auth('admin')->user()?->can('licenses.revoke'))
                     ->requiresConfirmation()->schema([

@@ -6,6 +6,7 @@ use App\Models\LicenseInstance;
 use App\Models\LicensePackage;
 use App\Models\LicenseVerificationLog;
 use App\Models\OpenApiCredential;
+use App\Services\LicenseSigner;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -28,19 +29,49 @@ class LicensePackageTest extends TestCase
         $details = openssl_pkey_get_details($key);
         self::assertIsArray($details);
         $this->publicKey = $details['key'];
-        config(['licensing.private_key' => $privateKey, 'licensing.lease_hours' => 72]);
+        config([
+            'licensing.private_key' => $privateKey,
+            'licensing.lease_hours' => 72,
+            'licensing.public_base_url' => 'https://license.example.com',
+        ]);
     }
 
     public function test_generated_package_matches_client_signature_and_claims(): void
     {
         $license = $this->license();
-        [$payload, $signature] = explode('.', $license->token, 2);
+        [$header, $payload, $signature] = explode('.', $license->token, 3);
 
-        self::assertSame(1, openssl_verify($payload, $this->decode($signature), $this->publicKey, OPENSSL_ALGO_SHA256));
+        self::assertSame(1, openssl_verify($header.'.'.$payload, $this->decode($signature), $this->publicKey, OPENSSL_ALGO_SHA256));
+        $headerClaims = json_decode($this->decode($header), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(LicenseSigner::LICENSE_TYP, $headerClaims['typ']);
+        self::assertSame(LicenseSigner::LICENSE_VERSION, $headerClaims['v']);
+
         $claims = json_decode($this->decode($payload), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($license->license_id, $claims['license_id']);
         self::assertSame(['payment', 'ai'], $claims['features']);
         self::assertSame(['example.com', '*.example.org'], $claims['domains']);
+        self::assertSame($license->openApiCredential->client_id, $claims['openapi']['client_id']);
+        self::assertSame($license->openApiCredential->client_secret, $claims['openapi']['client_secret']);
+        self::assertSame(
+            'https://license.example.com/openapi/v1/leases/valid',
+            $claims['endpoints']['lease_valid'],
+        );
+    }
+
+    public function test_rotating_openapi_secret_resigns_bound_license(): void
+    {
+        $license = $this->license();
+        $oldToken = $license->token;
+        $credential = $license->openApiCredential;
+        $newSecret = OpenApiCredential::generateSecret();
+
+        $credential->update(['client_secret' => $newSecret]);
+
+        $fresh = $license->fresh();
+        self::assertNotSame($oldToken, $fresh->token);
+        [, $payload] = explode('.', $fresh->token, 3);
+        $claims = json_decode($this->decode($payload), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($newSecret, $claims['openapi']['client_secret']);
     }
 
     public function test_remote_endpoint_issues_compatible_lease(): void
@@ -55,7 +86,7 @@ class LicensePackageTest extends TestCase
             'instance_id' => $instanceId,
             'domain' => 'example.com',
             'project' => 'cms',
-        ])->assertOk();
+        ], $license->openApiCredential)->assertOk();
 
         [$payload, $signature] = explode('.', $response->json('data.lease'), 2);
         self::assertSame(1, openssl_verify($payload, $this->decode($signature), $this->publicKey, OPENSSL_ALGO_SHA256));
@@ -93,7 +124,7 @@ class LicensePackageTest extends TestCase
             'instance_id' => '550e8400-e29b-41d4-a716-446655440000',
             'domain' => 'example.com',
             'project' => 'cms',
-        ])->assertForbidden()->assertJson(['code' => 403, 'reason' => 'revoked', 'message' => '合同终止']);
+        ], $license->openApiCredential)->assertForbidden()->assertJson(['code' => 403, 'reason' => 'revoked', 'message' => '合同终止']);
     }
 
     public function test_remote_endpoint_rejects_a_domain_outside_the_license(): void
@@ -106,7 +137,7 @@ class LicensePackageTest extends TestCase
             'instance_id' => '550e8400-e29b-41d4-a716-446655440000',
             'domain' => 'unauthorized.example.net',
             'project' => 'cms',
-        ])->assertForbidden()->assertJson([
+        ], $license->openApiCredential)->assertForbidden()->assertJson([
             'reason' => 'domain_mismatch',
             'message' => '当前域名未获得授权',
         ]);
@@ -145,15 +176,18 @@ class LicensePackageTest extends TestCase
 
     private function license(): LicensePackage
     {
+        $credential = OpenApiCredential::query()->create(['name' => '授权测试客户']);
+
         return LicensePackage::query()->create([
             'customer' => '测试客户',
             'project' => 'cms',
+            'open_api_credential_id' => $credential->id,
             'plan' => 'pro',
             'features' => ['payment', 'ai'],
             'domains' => ['example.com', '*.example.org'],
             'not_before' => now()->subMinute(),
             'expires_at' => now()->addYear(),
-        ]);
+        ])->load('openApiCredential');
     }
 
     private function decode(string $value): string

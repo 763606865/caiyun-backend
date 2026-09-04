@@ -6,6 +6,7 @@ use App\Services\LicenseSigner;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -14,6 +15,7 @@ use Illuminate\Support\Str;
  * @property string $license_id
  * @property string $customer
  * @property string|null $project
+ * @property int|null $open_api_credential_id
  * @property string $plan
  * @property list<string> $features
  * @property list<string> $domains
@@ -25,14 +27,21 @@ use Illuminate\Support\Str;
  * @property string|null $revoked_reason
  * @property CarbonImmutable|null $last_verified_at
  * @property CarbonImmutable|null $heartbeat_abnormal_notified_at
+ * @property-read OpenApiCredential|null $openApiCredential
  */
 #[Fillable([
-    'license_id', 'customer', 'project', 'plan', 'features', 'domains', 'issued_at',
+    'license_id', 'customer', 'project', 'open_api_credential_id', 'plan', 'features', 'domains', 'issued_at',
     'not_before', 'expires_at', 'token', 'revoked_at', 'revoked_reason', 'last_verified_at',
     'heartbeat_abnormal_notified_at',
 ])]
 class LicensePackage extends Model
 {
+    /** @return BelongsTo<OpenApiCredential, $this> */
+    public function openApiCredential(): BelongsTo
+    {
+        return $this->belongsTo(OpenApiCredential::class);
+    }
+
     /** @return HasMany<LicenseInstance, $this> */
     public function instances(): HasMany
     {
@@ -85,10 +94,17 @@ class LicensePackage extends Model
         return false;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * 写入授权书的完整 claims（含 OpenAPI 凭据与核验端点）。
+     *
+     * @return array<string, mixed>
+     */
     public function claims(): array
     {
-        return [
+        $this->loadMissing('openApiCredential');
+
+        $claims = [
+            'v' => LicenseSigner::LICENSE_VERSION,
             'license_id' => $this->license_id,
             'customer' => $this->customer,
             'plan' => $this->plan,
@@ -97,7 +113,33 @@ class LicensePackage extends Model
             'expires_at' => $this->expires_at->toIso8601String(),
             'features' => $this->features,
             'domains' => $this->domains,
+            'endpoints' => [
+                'lease_valid' => rtrim((string) config('licensing.public_base_url', config('app.url')), '/')
+                    .'/openapi/v1/leases/valid',
+            ],
         ];
+
+        if ($this->project !== null && $this->project !== '') {
+            $claims['project'] = $this->project;
+        }
+
+        if ($this->openApiCredential !== null) {
+            $claims['openapi'] = [
+                'client_id' => $this->openApiCredential->client_id,
+                'client_secret' => $this->openApiCredential->client_secret,
+            ];
+        }
+
+        return $claims;
+    }
+
+    /** 按当前关联凭据重新签发并静默保存授权书。 */
+    public function resignCertificate(): void
+    {
+        $this->loadMissing('openApiCredential');
+        $this->forceFill([
+            'token' => app(LicenseSigner::class)->signLicense($this->claims()),
+        ])->saveQuietly();
     }
 
     protected static function booted(): void
@@ -109,9 +151,14 @@ class LicensePackage extends Model
             if ($license->getAttribute('issued_at') === null) {
                 $license->setAttribute('issued_at', now());
             }
-            $claims = ['license_id', 'customer', 'plan', 'issued_at', 'not_before', 'expires_at', 'features', 'domains'];
+
+            $claims = [
+                'license_id', 'customer', 'project', 'open_api_credential_id', 'plan',
+                'issued_at', 'not_before', 'expires_at', 'features', 'domains',
+            ];
             if (! $license->exists || $license->isDirty($claims)) {
-                $license->token = app(LicenseSigner::class)->sign($license->claims());
+                $license->loadMissing('openApiCredential');
+                $license->token = app(LicenseSigner::class)->signLicense($license->claims());
             }
         });
     }

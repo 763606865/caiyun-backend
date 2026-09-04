@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -39,6 +40,12 @@ class OpenApiCredential extends Model
         return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
     }
 
+    /** @return HasMany<LicensePackage, $this> */
+    public function licensePackages(): HasMany
+    {
+        return $this->hasMany(LicensePackage::class);
+    }
+
     protected static function booted(): void
     {
         static::creating(function (OpenApiCredential $credential): void {
@@ -48,6 +55,17 @@ class OpenApiCredential extends Model
             if ($credential->client_secret === null || $credential->client_secret === '') {
                 $credential->client_secret = self::generateSecret();
             }
+        });
+
+        // 轮换 Client ID/Secret 后，绑定的授权书需重新签发以便下载到新凭据。
+        static::updated(function (OpenApiCredential $credential): void {
+            if (! $credential->wasChanged(['client_id', 'client_secret'])) {
+                return;
+            }
+
+            $credential->licensePackages()->each(function (LicensePackage $license): void {
+                $license->resignCertificate();
+            });
         });
     }
 
