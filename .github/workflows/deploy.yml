@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Deploy through SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           # ALIYUN_HOST 和 ALIYUN_USER 也可改成固定值或 GitHub Variables；
           # ALIYUN_SSH_KEY 必须是能够登录 ECS 的私钥，不能提交到仓库。
