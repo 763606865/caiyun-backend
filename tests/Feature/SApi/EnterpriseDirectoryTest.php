@@ -1,0 +1,58 @@
+<?php
+
+namespace Tests\Feature\SApi;
+
+use App\Models\PlatformApplication;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Tests\TestCase;
+
+class EnterpriseDirectoryTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function signed(string $method, string $uri, array $data = [])
+    {
+        $app = PlatformApplication::query()->firstOrCreate(['code' => 'test'], ['name' => 'Test', 'base_url' => '', 'is_enabled' => true]);
+        $body = $data ? json_encode($data) : '';
+        $timestamp = (string) now()->timestamp;
+        $nonce = Str::random(32);
+        $signature = hash_hmac('sha256', implode("\n", [$method, $uri, $timestamp, $nonce, hash('sha256', $body)]), $app->app_secret);
+
+        return $this->call($method, $uri, [], [], [], ['HTTP_ACCEPT' => 'application/json', 'CONTENT_TYPE' => 'application/json', 'HTTP_X_APP_KEY' => $app->app_key, 'HTTP_X_TIMESTAMP' => $timestamp, 'HTTP_X_NONCE' => $nonce, 'HTTP_X_SIGNATURE' => $signature], $body);
+    }
+
+    public function test_enterprise_employees_and_application_subscriptions(): void
+    {
+        $user = $this->signed('POST', '/sapi/users', ['phone' => '13800138002', 'password' => 'password123'])->assertCreated()->json('data.id');
+        $enterprise = $this->signed('POST', '/sapi/enterprises', ['code' => 'corp', 'name' => '企业'])->assertCreated()->json('data.id');
+        $other = $this->signed('POST', '/sapi/enterprises', ['code' => 'other', 'name' => '其他企业'])->assertCreated()->json('data.id');
+        $employeeBody = ['user_id' => $user, 'employee_no' => 'E001', 'position' => '工程师', 'is_enabled' => true];
+        $employeeResponse = $this->signed('POST', "/sapi/enterprises/$enterprise/employees", $employeeBody)->assertCreated()->assertJsonPath('data.user.phone', '13800138002');
+        $employee = $employeeResponse->json('data.id');
+        $this->signed('POST', "/sapi/enterprises/$enterprise/employees", $employeeBody)->assertUnprocessable();
+        $this->signed('GET', "/sapi/enterprises/$enterprise/employees")->assertOk()->assertJsonPath('data.total', 1);
+        $this->signed('GET', "/sapi/enterprises/$other/employees/$employee")->assertNotFound();
+        $this->signed('PATCH', "/sapi/enterprises/$other/employees/$employee", ['position' => '无权限'])->assertNotFound();
+        $this->signed('DELETE', "/sapi/enterprises/$other/employees/$employee")->assertNotFound();
+        $this->signed('PATCH', "/sapi/enterprises/$enterprise/employees/$employee", ['position' => '主管'])->assertOk()->assertJsonPath('data.position', '主管');
+        foreach (['OA' => '旗舰版', 'CRM' => '基础版', 'ERP' => '进阶版'] as $code => $package) {
+            $application = PlatformApplication::query()->create(['code' => $code, 'name' => $code, 'base_url' => '']);
+            $payload = ['application_id' => $application->id, 'package_name' => $package, 'seat_limit' => 100, 'starts_at' => '2026-01-01T00:00:00+08:00', 'ends_at' => '2027-01-01T00:00:00+08:00'];
+            $response = $this->signed('POST', "/sapi/enterprises/$enterprise/subscriptions", $payload)->assertCreated()->assertJsonPath('data.package_name', $package);
+            $id = $response->json('data.id');
+            $this->assertArrayNotHasKey('app_secret', $response->json('data.application'));
+            $this->assertArrayNotHasKey('app_key', $response->json('data.application'));
+            $this->signed('POST', "/sapi/enterprises/$enterprise/subscriptions", $payload)->assertUnprocessable();
+            $this->signed('GET', "/sapi/enterprises/$enterprise/subscriptions/$id")->assertOk();
+            $this->signed('GET', "/sapi/enterprises/$other/subscriptions/$id")->assertNotFound();
+            $this->signed('PATCH', "/sapi/enterprises/$enterprise/subscriptions/$id", ['ends_at' => '2025-01-01'])->assertUnprocessable();
+            $this->signed('PATCH', "/sapi/enterprises/$enterprise/subscriptions/$id", ['seat_limit' => 200])->assertOk()->assertJsonPath('data.seat_limit', 200);
+        }
+        $this->signed('GET', "/sapi/enterprises/$enterprise/subscriptions")->assertOk()->assertJsonPath('data.total', 3);
+        $this->signed('DELETE', "/sapi/enterprises/$other/subscriptions/$id")->assertNotFound();
+        $this->signed('DELETE', "/sapi/enterprises/$enterprise/subscriptions/$id")->assertOk();
+        $this->signed('DELETE', "/sapi/enterprises/$enterprise/employees/$employee")->assertOk();
+        $this->signed('GET', '/sapi/users/'.$user)->assertOk();
+    }
+}

@@ -2,6 +2,7 @@
 
 namespace App\Admin\Resources\Users\Schemas;
 
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
@@ -11,7 +12,8 @@ class UserForm
     {
         return $schema
             ->components([
-                TextInput::make('name')
+                Select::make('status')->label('状态')->options([0 => '禁用', 1 => '正常'])->default(1)->required(),
+                TextInput::make('nick_name')
                     ->label('姓名')
                     ->required()
                     ->maxLength(255),
@@ -21,7 +23,7 @@ class UserForm
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
-                TextInput::make('mobile')
+                TextInput::make('phone')
                     ->label('手机号')
                     ->tel()
                     ->unique(ignoreRecord: true)

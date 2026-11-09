@@ -20,7 +20,7 @@ class ApiExceptionRenderer
 {
     public function __invoke(Throwable $exception, Request $request): ?JsonResponse
     {
-        if (! $request->is('api/*', 'openapi/*')) {
+        if (! $request->is('api/*', 'openapi/*', 'sapi/*')) {
             return null;
         }
 

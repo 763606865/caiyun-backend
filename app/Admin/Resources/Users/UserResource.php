@@ -28,7 +28,9 @@ class UserResource extends Resource
 
     protected static ?int $navigationSort = 10;
 
-    protected static ?string $recordTitleAttribute = 'name';
+    protected static ?string $recordTitleAttribute = 'nick_name';
+
+    protected static string|\UnitEnum|null $navigationGroup = '中台管理';
 
     public static function form(Schema $schema): Schema
     {

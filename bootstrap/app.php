@@ -8,11 +8,13 @@ use App\Exceptions\ApiExceptionRenderer;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RecordClientContext;
 use App\OpenApi\Middleware\VerifyEncryptedOpenApiRequest;
+use App\SApi\Middleware\AuthenticateApplication;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function (): void {
+            Route::prefix('sapi')->middleware([AuthenticateApplication::class, 'throttle:120,1', SubstituteBindings::class])->group(base_path('routes/sapi.php'));
             Route::prefix('openapi')->group(base_path('routes/openapi.php'));
         },
     )
@@ -48,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*', 'openapi/*') || $request->expectsJson(),
+            fn (Request $request) => $request->is('api/*', 'openapi/*', 'sapi/*') || $request->expectsJson(),
         );
 
         $exceptions->render(new ApiExceptionRenderer);
