@@ -14,9 +14,8 @@ class SaveUserRequest extends Request
         $rules = [
             'real_name' => ['nullable', 'string', 'max:255'],
             'nick_name' => ['nullable', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:32'],
+            'phone' => ['required', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:255'],
             'status' => ['sometimes', 'integer', 'in:0,1'],
         ];
 
@@ -44,7 +43,6 @@ class SaveUserRequest extends Request
             'nick_name' => '昵称',
             'phone' => '手机号',
             'email' => '邮箱',
-            'password' => '密码',
             'status' => '用户状态',
         ];
     }

@@ -7,6 +7,7 @@ use App\SApi\Requests\PaginationRequest;
 use App\SApi\Requests\SaveUserRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 /** 中台用户管理接口。 */
 class UserController extends Controller
@@ -53,15 +54,20 @@ class UserController extends Controller
      *   nick_name: string，昵称（可选）
      *   phone: string，手机号（必填）
      *   email: string，邮箱（可选）
-     *   password: string，密码（必填）
+     *   密码由服务端随机生成，不接受同步密码。
      *   status: int，用户状态（可选）
      *
      * @param  SaveUserRequest  $request  经校验的用户创建参数
-     * @return JsonResponse HTTP 201，data 为创建后的用户记录，外层包含 code、meta；校验失败返回 422
+     * @return JsonResponse HTTP 201，data 仅包含创建后的用户 uuid，外层包含 code、meta；校验失败返回 422
      */
     public function store(SaveUserRequest $request): JsonResponse
     {
-        return $this->success(User::query()->create($request->validated()), 201);
+        $record = User::query()->create([
+            ...$request->validated(),
+            'password' => Str::random(64),
+        ]);
+
+        return $this->success(['uuid' => $record->uuid], 201);
     }
 
     /**
@@ -74,14 +80,14 @@ class UserController extends Controller
      *
      * @param  SaveUserRequest  $request  经校验的用户更新参数
      * @param  int  $id  路径参数，中台用户 ID
-     * @return JsonResponse HTTP 200，data 为更新后的用户记录，外层包含 code、meta；不存在返回 404，校验失败返回 422
+     * @return JsonResponse HTTP 200，data 仅包含更新后的用户 uuid，外层包含 code、meta；不存在返回 404，校验失败返回 422
      */
     public function update(SaveUserRequest $request, int $id): JsonResponse
     {
         $record = User::query()->findOrFail($id);
         $record->update($request->validated());
 
-        return $this->success($record->refresh());
+        return $this->success(['uuid' => $record->uuid]);
     }
 
     /**

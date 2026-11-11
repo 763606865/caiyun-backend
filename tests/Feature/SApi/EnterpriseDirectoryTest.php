@@ -3,6 +3,7 @@
 namespace Tests\Feature\SApi;
 
 use App\Models\PlatformApplication;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -22,9 +23,24 @@ class EnterpriseDirectoryTest extends TestCase
         return $this->call($method, $uri, [], [], [], ['HTTP_ACCEPT' => 'application/json', 'CONTENT_TYPE' => 'application/json', 'HTTP_X_APP_KEY' => $app->app_key, 'HTTP_X_TIMESTAMP' => $timestamp, 'HTTP_X_NONCE' => $nonce, 'HTTP_X_SIGNATURE' => $signature], $body);
     }
 
+    public function test_users_sync_without_password_and_return_uuid(): void
+    {
+        $response = $this->signed('POST', '/sapi/users', ['phone' => '13800138001', 'email' => 'sync@example.com'])->assertCreated();
+        $user = User::query()->where('phone', '13800138001')->sole();
+        $response->assertExactJson(array_replace($response->json(), ['data' => ['uuid' => $user->uuid]]));
+        $password = $user->password;
+        $this->assertNotEmpty($password);
+        $this->signed('PATCH', '/sapi/users/'.$user->id, ['email' => 'updated@example.com', 'password' => 'ignored-password'])
+            ->assertOk()->assertJsonPath('data.uuid', $user->uuid);
+        $this->assertSame($password, $user->fresh()->password);
+        $this->assertSame('updated@example.com', $user->fresh()->email);
+        $this->signed('POST', '/sapi/users', ['phone' => '13800138001'])->assertUnprocessable();
+    }
+
     public function test_enterprise_employees_and_application_subscriptions(): void
     {
-        $user = $this->signed('POST', '/sapi/users', ['phone' => '13800138002', 'password' => 'password123'])->assertCreated()->json('data.id');
+        $user = $this->signed('POST', '/sapi/users', ['phone' => '13800138002', 'password' => 'password123'])->assertCreated()->json('data.uuid');
+        $user = User::query()->where('phone', '13800138002')->sole()->id;
         $enterprise = $this->signed('POST', '/sapi/enterprises', ['code' => 'corp', 'name' => '企业'])->assertCreated()->json('data.id');
         $other = $this->signed('POST', '/sapi/enterprises', ['code' => 'other', 'name' => '其他企业'])->assertCreated()->json('data.id');
         $employeeBody = ['user_id' => $user, 'employee_no' => 'E001', 'position' => '工程师', 'is_enabled' => true];
