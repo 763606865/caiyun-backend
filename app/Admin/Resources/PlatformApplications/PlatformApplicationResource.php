@@ -10,6 +10,7 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
@@ -100,9 +101,23 @@ class PlatformApplicationResource extends Resource
                 Action::make('rotateSecret')
                     ->label('重置密钥')
                     ->requiresConfirmation()
+                    ->modalDescription('重置后旧密钥立即失效。新密钥将在成功提示中显示，请及时复制保存。')
                     ->action(function (PlatformApplication $record): void {
-                        $record->app_secret = bin2hex(random_bytes(32));
+                        $secret = bin2hex(random_bytes(32));
+                        $record->app_secret = $secret;
                         $record->save();
+
+                        Notification::make()
+                            ->title('密钥已重置，旧密钥立即失效')
+                            ->body('APP_SECRET：'.$secret.' 请立即复制保存，关闭提示后不再显示。')
+                            ->success()
+                            ->persistent()
+                            ->actions([
+                                Action::make('copySecret')
+                                    ->label('复制密钥')
+                                    ->alpineClickHandler('navigator.clipboard.writeText('.json_encode($secret).')'),
+                            ])
+                            ->send();
                     }),
             ]);
     }
