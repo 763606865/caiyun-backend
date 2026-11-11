@@ -1,6 +1,8 @@
 # 企业应用套餐
 
 所有请求均需[签名鉴权](authentication.md)。路径 `enterprise` 为中台企业 ID，`id` 为本关联记录 ID。
+推荐通过 `application_code` 指定应用，未知或空编码返回 422，不会回退到请求中的数字 ID。响应仍返回 `application_id` 及 `application.code`。
+
 复用应用管理中注册的应用，每个企业可同时绑定 OA、CRM、ERP 等多个应用，各应用有各自套餐。套餐为名称字段，暂未建设统一套餐目录、计费或权益自动下发。额度仅记录，不自动限制企业职工数；有效期和启用状态不会改变调用方应用鉴权。
 
 | 方法 | 地址 | 说明 |
@@ -15,7 +17,8 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| application_id | integer | 是 | 应用管理中的应用 ID；企业内唯一，每个应用一个套餐 |
+| application_code | string | 推荐 | 应用管理中的唯一编码，如 `OA`；由服务端解析应用 ID。与 application_id 二选一，同时提供时编码优先 |
+| application_id | integer | 未提供编码时必填 | 兼容旧客户端的数字应用 ID；企业内唯一，每个应用一个套餐 |
 | package_name | string | 是 | 套餐名称，最长 255；例如旗舰版、基础版、进阶版 |
 | seat_limit | integer | 是 | 用户额度，1–4294967295 |
 | starts_at | date string | 是 | 套餐开始时间，建议 ISO 8601 含时区 |
@@ -26,7 +29,7 @@ POST 请求示例（保存为 `subscriptions.json`）：
 
 ```json
 {
-  "application_id": 4,
+  "application_code": "OA",
   "package_name": "进阶版",
   "seat_limit": 100,
   "starts_at": "2026-01-01T00:00:00+08:00",

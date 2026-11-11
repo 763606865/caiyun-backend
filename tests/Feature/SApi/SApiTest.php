@@ -3,6 +3,7 @@
 namespace Tests\Feature\SApi;
 
 use App\Models\PlatformApplication;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -30,9 +31,10 @@ class SApiTest extends TestCase
 
     public function test_directory_crud(): void
     {
-        $user = $this->signed('POST', '/sapi/users', ['phone' => '13800138000', 'password' => 'password123', 'nick_name' => '测试'])->assertCreated()->json('data.id');
+        $user = $this->signed('POST', '/sapi/users', ['phone' => '13800138000', 'password' => 'password123', 'nick_name' => '测试'])->assertCreated()->json('data.uuid');
+        $user = User::query()->where('phone', '13800138000')->sole()->id;
         $enterprise = $this->signed('POST', '/sapi/enterprises', ['code' => 'test', 'name' => '企业', 'admin_user_id' => $user])->assertCreated()->json('data.id');
-        $organization = $this->signed('POST', '/sapi/organizations', ['code' => 'test', 'name' => '组织', 'enterprise_id' => $enterprise])->assertCreated()->json('data.id');
+        $organization = $this->signed('POST', '/sapi/organizations', ['code' => 'test-org', 'name' => '组织', 'enterprise_id' => $enterprise])->assertCreated()->json('data.id');
         foreach (['users' => $user, 'enterprises' => $enterprise, 'organizations' => $organization] as $resource => $id) {
             $this->signed('GET', '/sapi/'.$resource)->assertOk();
             $this->signed('GET', '/sapi/'.$resource.'/'.$id)->assertOk();
@@ -50,10 +52,10 @@ class SApiTest extends TestCase
     {
         config(['app.debug' => true]);
 
-        $this->signed('POST', '/sapi/users', ['phone' => '13800138001', 'password' => 'short'])
+        $this->signed('POST', '/sapi/users', [])
             ->assertUnprocessable()
             ->assertJsonPath('code', 422)
-            ->assertJsonPath('errors.password.0', '密码不能少于8个字符');
+            ->assertJsonPath('errors.phone.0', '手机号不能为空');
 
         $this->signed('POST', '/sapi/enterprises', [])
             ->assertUnprocessable()

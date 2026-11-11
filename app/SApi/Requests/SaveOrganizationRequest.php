@@ -2,6 +2,7 @@
 
 namespace App\SApi\Requests;
 
+use App\Enums\OrganizationType;
 use App\Models\PlatformOrganization;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -20,7 +21,7 @@ class SaveOrganizationRequest extends Request
             'parent_id' => ['nullable', 'integer', 'exists:platform_organizations,id'],
             'is_enabled' => ['sometimes', 'boolean'],
             'short_name' => ['nullable', 'string', 'max:255'],
-            'primary_type' => ['nullable', 'string', 'max:255'],
+            'primary_type' => ['nullable', Rule::enum(OrganizationType::class)],
             'area_code' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'logo' => ['nullable', 'string', 'max:255'],

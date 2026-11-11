@@ -38,6 +38,10 @@ class SaveEnterpriseRequest extends Request
             Rule::unique('platform_enterprises', 'code')->ignore($id),
         ];
 
+        if ($id === null) {
+            $rules['code'][] = Rule::unique('platform_organizations', 'code');
+        }
+
         return $rules;
     }
 

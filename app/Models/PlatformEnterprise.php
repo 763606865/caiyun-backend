@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * 中台企业表。
@@ -19,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $address 企业地址
  * @property string|null $description 企业简介
  * @property string|null $remark 备注
+ * @property string $uuid 全局唯一标识（UUID v7）
  * @property int $id 主键
  * @property string $code 唯一编码
  * @property string $name 名称
@@ -43,10 +45,23 @@ use Illuminate\Support\Carbon;
 ])]
 class PlatformEnterprise extends Model
 {
+    protected static function booted(): void
+    {
+        static::creating(function (self $record): void {
+            $record->uuid ??= (string) Str::uuid7();
+        });
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return ['is_enabled' => 'boolean'];
+    }
+
+    /** @return BelongsTo<PlatformOrganization, $this> */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(PlatformOrganization::class);
     }
 
     /** @return BelongsTo<User, $this> */

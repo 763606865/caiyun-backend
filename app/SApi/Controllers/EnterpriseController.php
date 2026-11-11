@@ -2,11 +2,14 @@
 
 namespace App\SApi\Controllers;
 
+use App\Enums\OrganizationType;
 use App\Models\PlatformEnterprise;
+use App\Models\PlatformOrganization;
 use App\SApi\Requests\PaginationRequest;
 use App\SApi\Requests\SaveEnterpriseRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /** 中台企业管理接口。 */
 class EnterpriseController extends Controller
@@ -44,7 +47,7 @@ class EnterpriseController extends Controller
     }
 
     /**
-     * 创建企业，仅保存通过校验的字段。
+     * 先创建企业类型的组织，再创建并绑定企业；整个流程在同一事务中完成。
      *
      * POST /sapi/enterprises
      *
@@ -66,7 +69,24 @@ class EnterpriseController extends Controller
      */
     public function store(SaveEnterpriseRequest $request): JsonResponse
     {
-        return $this->success(PlatformEnterprise::query()->create($request->validated()), 201);
+        $record = DB::transaction(function () use ($request): PlatformEnterprise {
+            $data = $request->validated();
+            $organization = PlatformOrganization::query()->create([
+                ...array_intersect_key($data, array_flip([
+                    'code', 'name', 'short_name', 'contact_name', 'contact_mobile',
+                    'address', 'description', 'remark', 'is_enabled',
+                ])),
+                'primary_type' => OrganizationType::Enterprise,
+            ]);
+
+            $enterprise = PlatformEnterprise::query()->create($data);
+            $enterprise->organization()->associate($organization);
+            $enterprise->save();
+
+            return $enterprise->load('organization');
+        });
+
+        return $this->success($record, 201);
     }
 
     /**

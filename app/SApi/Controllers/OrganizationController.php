@@ -55,7 +55,7 @@ class OrganizationController extends Controller
      *   parent_id: int，上级组织（可选）
      *   is_enabled: bool，启用状态（可选）
      *   short_name: string，简称（可选）
-     *   primary_type: string，主要类型（可选）
+     *   primary_type: string，主要类型（可选，OrganizationType 枚举编码，例如 enterprise、school）
      *   area_code: string，地区码（可选）
      *   address: string，地址（可选）
      *   logo: string，Logo（可选）

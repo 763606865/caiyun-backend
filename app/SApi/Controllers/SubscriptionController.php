@@ -32,7 +32,7 @@ class SubscriptionController extends Controller
     /**
      * POST /sapi/enterprises/{enterprise}/subscriptions
      *
-     * @param  SaveSubscriptionRequest  $request  JSON：application_id、package_name、seat_limit、starts_at、ends_at（均必填）、is_enabled（可选）
+     * @param  SaveSubscriptionRequest  $request  JSON：application_code（兼容 application_id）、package_name、seat_limit、starts_at、ends_at（均必填）、is_enabled（可选）
      * @param  int  $enterprise  企业 ID
      * @return JsonResponse HTTP 201，data 为新增应用套餐；校验失败返回 422
      */
@@ -40,7 +40,7 @@ class SubscriptionController extends Controller
     {
         $company = PlatformEnterprise::query()->findOrFail($enterprise);
 
-        $record = $company->subscriptions()->create($request->validated());
+        $record = $company->subscriptions()->create($request->safe()->except(['application_code']));
 
         return $this->success($record->refresh()->load(['application:id,code,name']), 201);
     }
@@ -72,7 +72,7 @@ class SubscriptionController extends Controller
         $company = PlatformEnterprise::query()->findOrFail($enterprise);
 
         $record = $company->subscriptions()->findOrFail($id);
-        $record->update($request->validated());
+        $record->update($request->safe()->except(['application_code']));
 
         return $this->success($record->refresh()->load(['application:id,code,name']));
     }

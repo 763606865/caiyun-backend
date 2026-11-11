@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
+use App\Enums\OrganizationType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * 中台组织表。
  *
  * @property string|null $short_name 简称
- * @property string|null $primary_type 主要类型
+ * @property OrganizationType|null $primary_type 主要类型
  * @property string|null $area_code 地区码
  * @property string|null $address 详细地址
  * @property string|null $logo Logo
@@ -23,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $description 组织简介
  * @property string|null $verified_status 认证状态
  * @property string|null $remark 备注
+ * @property string $uuid 全局唯一标识（UUID v7）
  * @property int $id 主键
  * @property int $enterprise_id 所属企业 ID
  * @property string $code 唯一编码
@@ -54,6 +57,19 @@ use Illuminate\Support\Carbon;
 ])]
 class PlatformOrganization extends Model
 {
+    protected static function booted(): void
+    {
+        static::creating(function (self $record): void {
+            $record->uuid ??= (string) Str::uuid7();
+        });
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return ['primary_type' => OrganizationType::class];
+    }
+
     /** @return BelongsTo<PlatformEnterprise, $this> */
     public function enterprise(): BelongsTo
     {

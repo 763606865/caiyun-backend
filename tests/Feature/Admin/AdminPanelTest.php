@@ -5,9 +5,13 @@ namespace Tests\Feature\Admin;
 use App\Admin\Resources\PlatformEnterprises\Pages\EditPlatformEnterprise;
 use App\Admin\Resources\PlatformEnterprises\RelationManagers\EmployeesRelationManager;
 use App\Admin\Resources\PlatformEnterprises\RelationManagers\SubscriptionsRelationManager;
+use App\Admin\Resources\PlatformOrganizations\Pages\ManagePlatformOrganizations;
+use App\Enums\OrganizationType;
 use App\Models\AdminUser;
 use App\Models\PlatformEnterprise;
+use App\Models\PlatformOrganization;
 use Database\Seeders\AdminAuthorizationSeeder;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -65,6 +69,21 @@ class AdminPanelTest extends TestCase
             'name' => '测试企业',
         ]);
         $this->get('/admin/platform-enterprises/'.$enterprise->id.'/edit')->assertOk();
+
+        $organization = PlatformOrganization::query()->create([
+            'enterprise_id' => $enterprise->id,
+            'code' => 'admin-school',
+            'name' => '测试学校',
+            'primary_type' => OrganizationType::School,
+        ]);
+        Livewire::test(ManagePlatformOrganizations::class)
+            ->assertTableColumnFormattedStateSet('primary_type', '学校/教育机构', $organization)
+            ->mountAction(TestAction::make('edit')->table($organization))
+            ->assertSchemaStateSet(['primary_type' => 'school'])
+            ->setActionData(['primary_type' => 'medical'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+        $this->assertSame(OrganizationType::Medical, $organization->fresh()->primary_type);
 
         foreach ([
             EmployeesRelationManager::class,

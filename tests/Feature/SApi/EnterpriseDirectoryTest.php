@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\SApi;
 
+use App\Enums\OrganizationType;
 use App\Models\PlatformApplication;
+use App\Models\PlatformOrganization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -35,6 +37,57 @@ class EnterpriseDirectoryTest extends TestCase
         $this->assertSame($password, $user->fresh()->password);
         $this->assertSame('updated@example.com', $user->fresh()->email);
         $this->signed('POST', '/sapi/users', ['phone' => '13800138001'])->assertUnprocessable();
+    }
+
+    public function test_directory_records_return_stable_uuids(): void
+    {
+        $enterprise = $this->signed('POST', '/sapi/enterprises', ['code' => 'uuid-corp', 'name' => '企业'])->assertCreated();
+        $enterpriseId = $enterprise->json('data.id');
+        $enterprise->assertJsonPath('data.organization.primary_type', 'enterprise');
+        $this->assertSame($enterprise->json('data.organization.id'), $enterprise->json('data.organization_id'));
+        $this->assertTrue(Str::isUuid($enterprise->json('data.organization.uuid')));
+        $this->assertDatabaseHas('platform_organizations', ['id' => $enterprise->json('data.organization_id'), 'enterprise_id' => null]);
+        $enterpriseUuid = $enterprise->json('data.uuid');
+        $this->assertTrue(Str::isUuid($enterpriseUuid));
+        $organization = $this->signed('POST', '/sapi/organizations', ['enterprise_id' => $enterpriseId, 'code' => 'uuid-org', 'name' => '组织'])->assertCreated();
+        $organizationId = $organization->json('data.id');
+        $organizationUuid = $organization->json('data.uuid');
+        $this->assertTrue(Str::isUuid($organizationUuid));
+        $this->assertNotSame($enterpriseUuid, $organizationUuid);
+        foreach (['enterprises' => [$enterpriseId, $enterpriseUuid], 'organizations' => [$organizationId, $organizationUuid]] as $resource => [$id, $uuid]) {
+            $this->signed('GET', '/sapi/'.$resource.'/'.$id)->assertOk()->assertJsonPath('data.uuid', $uuid);
+            $this->signed('PATCH', '/sapi/'.$resource.'/'.$id, ['name' => '新名称', 'uuid' => (string) Str::uuid7()])->assertOk()->assertJsonPath('data.uuid', $uuid);
+            $this->signed('GET', '/sapi/'.$resource)->assertOk()->assertJsonFragment(['uuid' => $uuid]);
+        }
+    }
+
+    public function test_organization_primary_types_are_validated_and_returned_as_codes(): void
+    {
+        $enterprise = $this->signed('POST', '/sapi/enterprises', ['code' => 'type-corp', 'name' => '企业'])->assertCreated()->json('data.id');
+        $payload = ['enterprise_id' => $enterprise, 'code' => 'school-org', 'name' => '学校', 'primary_type' => 'school'];
+        $id = $this->signed('POST', '/sapi/organizations', $payload)
+            ->assertCreated()->assertJsonPath('data.primary_type', 'school')->json('data.id');
+
+        $this->assertDatabaseHas('platform_organizations', ['id' => $id, 'primary_type' => 'school']);
+        $this->assertSame(OrganizationType::School, PlatformOrganization::query()->findOrFail($id)->primary_type);
+        $this->signed('GET', '/sapi/organizations/'.$id)->assertOk()->assertJsonPath('data.primary_type', 'school');
+        $this->signed('GET', '/sapi/organizations')->assertOk()->assertJsonFragment(['primary_type' => 'school']);
+        $this->signed('PATCH', '/sapi/organizations/'.$id, ['name' => '新学校'])
+            ->assertOk()->assertJsonPath('data.primary_type', 'school');
+
+        foreach (['department', '企业', 123, ['school']] as $invalidType) {
+            $this->signed('POST', '/sapi/organizations', array_replace($payload, ['code' => 'invalid-org', 'primary_type' => $invalidType]))
+                ->assertUnprocessable()->assertJsonValidationErrors('primary_type');
+            $this->signed('PATCH', '/sapi/organizations/'.$id, ['primary_type' => $invalidType])
+                ->assertUnprocessable()->assertJsonValidationErrors('primary_type');
+        }
+
+        $this->assertDatabaseMissing('platform_organizations', ['code' => 'invalid-org']);
+        $this->signed('PATCH', '/sapi/organizations/'.$id, ['primary_type' => 'government'])
+            ->assertOk()->assertJsonPath('data.primary_type', 'government');
+        $this->signed('PATCH', '/sapi/organizations/'.$id, ['primary_type' => null])
+            ->assertOk()->assertJsonPath('data.primary_type', null);
+        $this->assertNull(PlatformOrganization::query()->findOrFail($id)->primary_type);
     }
 
     public function test_enterprise_employees_and_application_subscriptions(): void

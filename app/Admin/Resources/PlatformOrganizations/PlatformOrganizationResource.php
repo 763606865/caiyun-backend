@@ -2,8 +2,12 @@
 
 namespace App\Admin\Resources\PlatformOrganizations;
 
+use App\Admin\Forms\Components\RegionSelect;
+use App\Enums\OrganizationType;
+use App\Enums\OrganizationVerificationStatus;
 use App\Models\PlatformOrganization;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -13,6 +17,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class PlatformOrganizationResource extends Resource
 {
@@ -53,18 +58,29 @@ class PlatformOrganizationResource extends Resource
                 TextInput::make('short_name')
                     ->label('简称')
                     ->maxLength(255),
-                TextInput::make('primary_type')
+                Select::make('primary_type')
                     ->label('主要类型')
-                    ->maxLength(255),
-                TextInput::make('area_code')
-                    ->label('地区码')
-                    ->maxLength(255),
+                    ->options(OrganizationType::options()),
+                RegionSelect::make()->columnSpanFull(),
                 TextInput::make('address')
                     ->label('详细地址')
                     ->maxLength(255),
-                TextInput::make('logo')
+                FileUpload::make('logo')
                     ->label('Logo')
-                    ->maxLength(255),
+                    ->disk('public')
+                    ->directory('organizations/logos')
+                    ->visibility('public')
+                    ->image()
+                    ->imageEditor()
+                    ->maxSize(2048)
+                    ->fetchFileInformation(fn (?PlatformOrganization $record): bool => ! Str::isUrl($record->logo ?? '', ['http', 'https']))
+                    ->getUploadedFileUsing(function (FileUpload $component, string $file): ?array {
+                        if (Str::isUrl($file, ['http', 'https'])) {
+                            return ['name' => basename(parse_url($file, PHP_URL_PATH) ?: 'Logo'), 'size' => 0, 'type' => null, 'url' => $file];
+                        }
+
+                        return $component->getUploadedFile($file, null);
+                    }),
                 TextInput::make('website')
                     ->label('官方网站')
                     ->maxLength(255),
@@ -80,9 +96,18 @@ class PlatformOrganizationResource extends Resource
                 TextInput::make('description')
                     ->label('组织简介')
                     ->maxLength(255),
-                TextInput::make('verified_status')
+                Select::make('verified_status')
                     ->label('认证状态')
-                    ->maxLength(255),
+                    ->options(function (?PlatformOrganization $record): array {
+                        $options = OrganizationVerificationStatus::options();
+
+                        if (filled($record?->verified_status) && ! isset($options[$record->verified_status])) {
+                            $options[$record->verified_status] = $record->verified_status;
+                        }
+
+                        return $options;
+                    })
+                    ->default(OrganizationVerificationStatus::Unverified->value),
                 TextInput::make('remark')
                     ->label('备注')
                     ->maxLength(255),
@@ -91,7 +116,6 @@ class PlatformOrganizationResource extends Resource
                     ->relationship('enterprise', 'name')
                     ->searchable()
                     ->preload()
-                    ->required()
                     ->label('所属企业'),
                 TextInput::make('code')
                     ->required()
@@ -111,7 +135,11 @@ class PlatformOrganizationResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('short_name')->label('简称')->searchable()->toggleable(),
-                TextColumn::make('primary_type')->label('主要类型')->searchable()->toggleable(),
+                TextColumn::make('primary_type')
+                    ->label('主要类型')
+                    ->formatStateUsing(fn (?OrganizationType $state): ?string => $state?->label())
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('area_code')->label('地区码')->searchable()->toggleable(),
                 TextColumn::make('address')->label('详细地址')->searchable()->toggleable(),
                 TextColumn::make('logo')->label('Logo')->searchable()->toggleable(),
@@ -120,7 +148,11 @@ class PlatformOrganizationResource extends Resource
                 TextColumn::make('contact_mobile')->label('联系电话')->searchable()->toggleable(),
                 TextColumn::make('contact_email')->label('联系邮箱')->searchable()->toggleable(),
                 TextColumn::make('description')->label('组织简介')->searchable()->toggleable(),
-                TextColumn::make('verified_status')->label('认证状态')->searchable()->toggleable(),
+                TextColumn::make('verified_status')
+                    ->label('认证状态')
+                    ->formatStateUsing(fn (?string $state): ?string => OrganizationVerificationStatus::tryFrom($state ?? '')?->label() ?? $state)
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('remark')->label('备注')->searchable()->toggleable(),
 
                 TextColumn::make('enterprise.name')
