@@ -75,18 +75,34 @@ class SaveOrganizationRequest extends Request
     }
 
     /** 通过基础字段校验后，再检查组织层级是否形成循环。 */
+    /** @return list<\Closure(Validator): void> */
     public function after(): array
     {
         return [function (Validator $validator): void {
-            if ($validator->errors()->isNotEmpty() || ! $this->route('id') || ! $this->filled('parent_id')) {
+            if ($validator->errors()->isNotEmpty()) {
                 return;
             }
 
+            $existing = $this->route('id') ? PlatformOrganization::query()->whereKey($this->route('id'))->first() : null;
+            if ($existing && $this->has('enterprise_id') && (int) $this->input('enterprise_id') !== (int) $existing->enterprise_id) {
+                $validator->errors()->add('enterprise_id', '组织不能迁移到其他企业');
+
+                return;
+            }
+            if (! $this->filled('parent_id')) {
+                return;
+            }
             $parent = PlatformOrganization::query()->find($this->integer('parent_id'));
+            $enterpriseId = $this->input('enterprise_id') ?? PlatformOrganization::query()->whereKey($this->route('id'))->first()?->enterprise_id;
+            if ($parent && (int) $parent->enterprise_id !== (int) $enterpriseId) {
+                $validator->errors()->add('parent_id', '上级组织必须属于同一企业');
+
+                return;
+            }
             $seen = [];
 
             while ($parent) {
-                if ($parent->id === (int) $this->route('id') || isset($seen[$parent->id])) {
+                if ((string) $parent->id === $this->route('id') || isset($seen[$parent->id])) {
                     $validator->errors()->add('parent_id', '上级组织不能形成循环');
 
                     return;

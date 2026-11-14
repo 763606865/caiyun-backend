@@ -5,6 +5,7 @@ namespace App\SApi\Controllers;
 use App\Models\PlatformEnterprise;
 use App\SApi\Requests\PaginationRequest;
 use App\SApi\Requests\SaveSubscriptionRequest;
+use App\Services\Platform\IntegrationAccess;
 use Illuminate\Http\JsonResponse;
 
 /** 企业应用套餐接口，所有记录均按路径中的企业隔离。 */
@@ -21,7 +22,7 @@ class SubscriptionController extends Controller
     {
         $company = PlatformEnterprise::query()->findOrFail($enterprise);
 
-        $records = $company->subscriptions()
+        $records = $company->subscriptions()->when(! app(IntegrationAccess::class)->allows(request()->attributes->get('sapi_application'), 'platform.admin'), fn ($query) => $query->where('application_id', request()->attributes->get('sapi_application')->id))
             ->with(['application:id,code,name'])
             ->orderByDesc('id')
             ->paginate($request->validated('per_page', 20));

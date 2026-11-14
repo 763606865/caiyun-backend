@@ -60,13 +60,14 @@ class SaveSubscriptionRequest extends Request
     }
 
     /** 合并更新前后的时间，避免部分更新产生无效套餐区间。 */
+    /** @return list<\Closure(Validator): void> */
     public function after(): array
     {
         return [function (Validator $validator): void {
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
-            $record = $this->route('id') ? PlatformSubscription::query()->where('enterprise_id', $this->route('enterprise'))->find($this->route('id')) : null;
+            $record = $this->route('id') ? PlatformSubscription::query()->where('enterprise_id', $this->route('enterprise'))->whereKey($this->route('id'))->first() : null;
             $start = $this->input('starts_at', $record?->starts_at);
             $end = $this->input('ends_at', $record?->ends_at);
             if ($start && $end && Carbon::parse($end)->lessThanOrEqualTo(Carbon::parse($start))) {

@@ -23,7 +23,7 @@ class VerifyEncryptedOpenApiRequest
         if ($clientId === '' || ! ctype_digit($timestamp) || ! preg_match('/^[A-Za-z0-9_-]{16,128}$/', $nonce) || $signature === '') {
             return $this->reject('invalid_request', 'OpenAPI 认证请求头不完整', 401);
         }
-        if (abs(now()->timestamp - (int) $timestamp) > max(1, (int) config('openapi.timestamp_tolerance', 300))) {
+        if (abs(now()->getTimestamp() - (int) $timestamp) > max(1, (int) config('openapi.timestamp_tolerance', 300))) {
             return $this->reject('timestamp_expired', '请求时间戳已过期', 401);
         }
 

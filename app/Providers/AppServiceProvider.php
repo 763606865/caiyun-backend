@@ -5,15 +5,20 @@ namespace App\Providers;
 use App\Models\Category;
 use App\Models\Content;
 use App\Models\Media;
+use App\Models\PlatformEmployee;
+use App\Models\PlatformEnterprise;
+use App\Models\PlatformOrganization;
 use App\Models\SystemSetting;
 use App\Models\Tag;
+use App\Models\User;
 use App\Observers\CmsAuditObserver;
+use App\Observers\PlatformDirectoryObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,6 +36,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        foreach ([PlatformEnterprise::class, PlatformOrganization::class, PlatformEmployee::class, User::class] as $model) {
+            $model::observe(PlatformDirectoryObserver::class);
+        }
 
         foreach ([Content::class, Category::class, Tag::class, Media::class, SystemSetting::class] as $model) {
             $model::observe(CmsAuditObserver::class);

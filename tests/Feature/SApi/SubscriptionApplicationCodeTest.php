@@ -5,6 +5,7 @@ namespace Tests\Feature\SApi;
 use App\Models\PlatformApplication;
 use App\Models\PlatformEnterprise;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -73,6 +74,7 @@ class SubscriptionApplicationCodeTest extends TestCase
         $application = PlatformApplication::query()->firstOrCreate(['code' => 'sapi-code-test'], [
             'name' => 'SAPI', 'base_url' => '', 'is_enabled' => true,
         ]);
+        DB::table('platform_application_scopes')->insertOrIgnore(['application_id' => $application->id, 'enterprise_id' => 0, 'scope' => 'platform.admin']);
         $body = json_encode($payload, JSON_THROW_ON_ERROR);
         $timestamp = (string) now()->timestamp;
         $nonce = Str::random(32);

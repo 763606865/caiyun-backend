@@ -124,7 +124,7 @@ class EnterpriseController extends Controller
         $record = PlatformEnterprise::query()->findOrFail($id);
 
         try {
-            $record->delete();
+            DB::transaction(fn () => $record->delete());
         } catch (QueryException $exception) {
             if (str_starts_with((string) $exception->getCode(), '23')) {
                 return $this->error('记录仍有关联数据，无法删除', 409);

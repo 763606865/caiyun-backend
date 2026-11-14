@@ -7,10 +7,14 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * 企业职工，一个用户可以加入多个企业。
  *
+ * @property string $uuid 稳定任职标识
+ * @property int|null $organization_id 任职部门
+ * @property-read PlatformOrganization|null $organization 任职部门
  * @property int $id 职工关联 ID
  * @property int $enterprise_id 所属企业 ID
  * @property int $user_id 用户 ID
@@ -24,6 +28,7 @@ use Illuminate\Support\Carbon;
  */
 #[Table(name: 'platform_employees')]
 #[Fillable([
+    'organization_id',
     'enterprise_id',
     'user_id',
     'employee_no',
@@ -32,10 +37,23 @@ use Illuminate\Support\Carbon;
 ])]
 class PlatformEmployee extends Model
 {
+    protected static function booted(): void
+    {
+        static::creating(function (self $record): void {
+            $record->uuid ??= (string) Str::uuid7();
+        });
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return ['is_enabled' => 'boolean'];
+    }
+
+    /** @return BelongsTo<PlatformOrganization, $this> */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(PlatformOrganization::class);
     }
 
     /** @return BelongsTo<User, $this> */

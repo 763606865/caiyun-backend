@@ -3,12 +3,17 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Http;
 
 abstract class TestCase extends BaseTestCase
 {
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Tests must never inherit a cloud SMS transport or make an unmocked HTTP request.
+        config(['sms.default' => 'log']);
+        Http::preventStrayRequests();
 
         $this->withHeaders([
             'X-Client-Type' => 'web',

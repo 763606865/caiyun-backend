@@ -15,9 +15,6 @@ class LicenseLeaseController extends Controller
      *
      * POST /openapi/v1/leases/valid
      *
-     * @param Request $request
-     * @param LicenseSigner $signer
-     * @return JsonResponse
      * @throws \Exception
      */
     public function valid(Request $request, LicenseSigner $signer, LicenseVerificationRecorder $recorder): JsonResponse

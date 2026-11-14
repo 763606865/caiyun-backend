@@ -67,7 +67,7 @@ class PlatformOrganization extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['primary_type' => OrganizationType::class];
+        return ['primary_type' => OrganizationType::class, 'is_enabled' => 'boolean'];
     }
 
     /** @return BelongsTo<PlatformEnterprise, $this> */

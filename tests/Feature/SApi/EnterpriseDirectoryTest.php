@@ -7,6 +7,7 @@ use App\Models\PlatformApplication;
 use App\Models\PlatformOrganization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -17,6 +18,7 @@ class EnterpriseDirectoryTest extends TestCase
     private function signed(string $method, string $uri, array $data = [])
     {
         $app = PlatformApplication::query()->firstOrCreate(['code' => 'test'], ['name' => 'Test', 'base_url' => '', 'is_enabled' => true]);
+        DB::table('platform_application_scopes')->insertOrIgnore(['application_id' => $app->id, 'enterprise_id' => 0, 'scope' => 'platform.admin']);
         $body = $data ? json_encode($data) : '';
         $timestamp = (string) now()->timestamp;
         $nonce = Str::random(32);

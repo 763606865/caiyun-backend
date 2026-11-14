@@ -150,7 +150,7 @@ HTTP 201 响应示例：
 | parent_id | integer / null | 上级组织 ID；null 为顶级 |
 | is_enabled | integer / boolean | 启用状态，创建默认 true |
 
-组织 is_enabled 未显式设置 boolean cast，详情可能返回 0/1（SQLite 示例），创建时提交布尔值也可能直接返回布尔值。组织类型使用固定枚举编码，认证状态仍为自由字符串；更新 parent_id 时会检查是否形成循环，目前不限制上级组织所属企业。
+组织 is_enabled 已统一为布尔值。组织类型使用固定枚举编码，认证状态仍为自由字符串；更新 parent_id 时检查循环与同企业归属；组织不能直接迁移到其他企业。
 
 ## 分页列表
 

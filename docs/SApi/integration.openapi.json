@@ -1,0 +1,894 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "彩云第一阶段身份目录与授权SAPI",
+    "version": "2026-11-14"
+  },
+  "paths": {
+    "/sapi/directory/upserts": {
+      "post": {
+        "summary": "幂等来源目录写入；payload白名单见配套文档",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "entity_uuid": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "enterprise_uuid": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "entity_type": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "source_version": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "entity_type",
+                  "source_system",
+                  "source_id",
+                  "source_version",
+                  "idempotency_key",
+                  "payload"
+                ],
+                "properties": {
+                  "entity_type": {
+                    "type": "string",
+                    "enum": [
+                      "enterprise",
+                      "user",
+                      "organization",
+                      "employment"
+                    ]
+                  },
+                  "source_system": {
+                    "type": "string"
+                  },
+                  "source_id": {
+                    "type": "string"
+                  },
+                  "source_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "enterprise_uuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "entity_uuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "idempotency_key": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sapi/directory/snapshots": {
+      "get": {
+        "summary": "按企业/类型一致快照，100条每页，30分钟有效",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "snapshot_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "cursor": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "next_page": {
+                          "type": "integer",
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "parameters": [
+          {
+            "name": "enterprise_uuid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "enterprise",
+                "user",
+                "organization",
+                "employment"
+              ]
+            }
+          },
+          {
+            "name": "snapshot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/sapi/directory/changes": {
+      "get": {
+        "summary": "每企业增量，含停用与删除墓碑",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "next_cursor": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "parameters": [
+          {
+            "name": "enterprise_uuid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      }
+    },
+    "/sapi/identity/resolve": {
+      "post": {
+        "summary": "仅按本应用稳定来源键精确查映射",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层"
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enterprise_uuid",
+                  "entity_type"
+                ],
+                "properties": {
+                  "enterprise_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "entity_type": {
+                    "type": "string",
+                    "enum": [
+                      "enterprise",
+                      "user",
+                      "organization",
+                      "employment"
+                    ]
+                  },
+                  "source_id": {
+                    "type": "string"
+                  },
+                  "entity_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sapi/auth/check": {
+      "post": {
+        "summary": "实时授权检查；目标编码须匹配签名应用",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthorizationResult"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "user_uuid",
+                  "enterprise_uuid",
+                  "employment_uuid",
+                  "application_code"
+                ],
+                "properties": {
+                  "user_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "enterprise_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "employment_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "application_code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sapi/auth/exchange": {
+      "post": {
+        "summary": "单次兑换60秒票据；绑定应用、回跳与state",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuthorizationResult"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "redirect_uri"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/login-tickets": {
+      "post": {
+        "summary": "仅当前中台已认证用户申请自身任职票据",
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层"
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enterprise_uuid",
+                  "application_code",
+                  "redirect_uri",
+                  "state"
+                ],
+                "properties": {
+                  "enterprise_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "application_code": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "state": {
+                    "type": "string",
+                    "minLength": 16
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sapi/enterprises/{enterpriseUuid}/application-grants/{applicationCode}": {
+      "put": {
+        "summary": "管理应用scope与真实企业管理员身份双重校验",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": [],
+            "Bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层"
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "is_enabled"
+                ],
+                "properties": {
+                  "is_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "enterpriseUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "applicationCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/sapi/enterprises/{enterpriseUuid}/employments/{employmentUuid}/application-grants/{applicationCode}": {
+      "put": {
+        "summary": "管理应用scope与真实企业管理员身份双重校验",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": [],
+            "Bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层"
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "is_enabled"
+                ],
+                "properties": {
+                  "is_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "enterpriseUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "applicationCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employmentUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/sapi/integration/status": {
+      "get": {
+        "summary": "平台运维scope专用监控摘要",
+        "security": [
+          {
+            "AppKey": [],
+            "Timestamp": [],
+            "Nonce": [],
+            "Signature": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功；code/data/meta外层"
+          },
+          "401": {
+            "description": "凭证或票据无效"
+          },
+          "403": {
+            "description": "无应用或企业授权"
+          },
+          "404": {
+            "description": "对象不存在或不可见"
+          },
+          "409": {
+            "description": "幂等/版本冲突或快照过期"
+          },
+          "422": {
+            "description": "字段校验失败"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AppKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-App-Key"
+      },
+      "Timestamp": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Timestamp"
+      },
+      "Nonce": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Nonce"
+      },
+      "Signature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Signature"
+      },
+      "Bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Identity": {
+        "type": "object",
+        "required": [
+          "user_uuid",
+          "enterprise_uuid",
+          "employment_uuid",
+          "application_code"
+        ],
+        "properties": {
+          "user_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "enterprise_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "employment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "application_code": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthorizationResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Identity"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "version": {
+                "type": "integer"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "valid_until": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "state": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

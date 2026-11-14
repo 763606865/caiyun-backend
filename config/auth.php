@@ -135,6 +135,6 @@ return [
 
     'sms' => [
         'valid_enabled' => env('AUTH_SMS_ENABLED', true),
-    ]
+    ],
 
 ];

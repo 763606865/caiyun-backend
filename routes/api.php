@@ -7,6 +7,7 @@ use App\Api\Controllers\CustomerRequirementController;
 use App\Api\Controllers\DeviceController;
 use App\Api\Controllers\FileController;
 use App\Api\Controllers\UserController;
+use App\SApi\Controllers\IntegrationAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
@@ -37,3 +38,5 @@ Route::middleware('auth:api')->group(function (): void {
     Route::patch('/user/phone', [UserController::class, 'updatePhone'])->middleware('throttle:10,1');
     // ==============================================================================
 });
+
+Route::post('platform/login-tickets', [IntegrationAuthController::class, 'ticket'])->middleware(['auth:api', 'throttle:20,1']);

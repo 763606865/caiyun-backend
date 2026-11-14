@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -20,7 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $project 项目标识
  * @property string|null $app_version 应用版本
  * @property string $status active/abnormal
- * @property Carbon $first_verified_at 首次验证时间
+ * @property CarbonInterface $first_verified_at 首次验证时间
  * @property Carbon $last_verified_at 最后成功验证时间
  * @property string|null $last_ip 最后请求 IP
  * @property Carbon|null $abnormal_notified_at 异常通知时间

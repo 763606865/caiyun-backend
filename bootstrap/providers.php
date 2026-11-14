@@ -1,8 +1,13 @@
 <?php
 
+use App\Admin\AdminPanelProvider;
+use App\Libs\Oss\ServiceProvider;
+use App\Providers\AppServiceProvider;
+use App\Providers\HorizonServiceProvider;
+
 return [
-    App\Admin\AdminPanelProvider::class,
-    App\Libs\Oss\ServiceProvider::class,
-    App\Providers\AppServiceProvider::class,
-    App\Providers\HorizonServiceProvider::class,
+    AdminPanelProvider::class,
+    ServiceProvider::class,
+    AppServiceProvider::class,
+    HorizonServiceProvider::class,
 ];

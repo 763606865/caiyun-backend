@@ -68,6 +68,7 @@ class PlatformApplicationResource extends Resource
                     ->label('应用地址'),
                 TextInput::make('app_key')->label('APP_KEY')->disabled()->dehydrated(false)->visibleOn('edit'),
                 TextInput::make('app_secret')->label('APP_SECRET')->password()->revealable()->disabled()->dehydrated(false)->visibleOn('edit'),
+                TagsInput::make('redirect_uris')->label('登录回跳白名单')->nestedRecursiveRules(['url'])->helperText('精确匹配完整URL，不使用通配符'),
                 TagsInput::make('allowed_ips')->label('IP 白名单')->nestedRecursiveRules(['ip'])->helperText('留空表示不限制'),
                 DateTimePicker::make('expires_at')->label('凭证过期时间')->helperText('留空表示长期有效'),
                 TextInput::make('webhook_url')->label('Webhook 地址')->url()->maxLength(500),

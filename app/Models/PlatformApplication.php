@@ -12,7 +12,8 @@ use Illuminate\Support\Carbon;
  *
  * @property string $app_key 应用公开凭证
  * @property string $app_secret 加密存储的应用密钥
- * @property array|null $allowed_ips IP 白名单
+ * @property list<string>|null $allowed_ips IP 白名单
+ * @property list<string>|null $redirect_uris 精确登录回跳白名单
  * @property Carbon|null $expires_at 凭证过期时间
  * @property string|null $webhook_url 事件回调地址
  * @property string|null $remark 备注
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  */
 #[Table(name: 'platform_applications')]
 #[Fillable([
+    'redirect_uris',
     'code',
     'name',
     'base_url',
@@ -51,6 +53,7 @@ class PlatformApplication extends Model
             'is_enabled' => 'boolean',
             'app_secret' => 'encrypted',
             'allowed_ips' => 'array',
+            'redirect_uris' => 'array',
             'expires_at' => 'datetime',
         ];
     }

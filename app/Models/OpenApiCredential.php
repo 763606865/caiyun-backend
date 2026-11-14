@@ -49,10 +49,10 @@ class OpenApiCredential extends Model
     protected static function booted(): void
     {
         static::creating(function (OpenApiCredential $credential): void {
-            if ($credential->client_id === null || $credential->client_id === '') {
+            if ($credential->getAttribute('client_id') === null || $credential->client_id === '') {
                 $credential->client_id = 'opk_'.Str::lower(Str::random(32));
             }
-            if ($credential->client_secret === null || $credential->client_secret === '') {
+            if ($credential->getAttribute('client_secret') === null || $credential->client_secret === '') {
                 $credential->client_secret = self::generateSecret();
             }
         });

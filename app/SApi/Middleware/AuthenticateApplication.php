@@ -18,7 +18,7 @@ class AuthenticateApplication
         $timestamp = (string) $request->header('X-Timestamp');
         $nonce = (string) $request->header('X-Nonce');
         $signature = (string) $request->header('X-Signature');
-        if (! ctype_digit($timestamp) || abs(now()->timestamp - (int) $timestamp) > 300 || ! preg_match('/^[A-Za-z0-9_-]{16,128}$/', $nonce)) {
+        if (! ctype_digit($timestamp) || abs(now()->getTimestamp() - (int) $timestamp) > 300 || ! preg_match('/^[A-Za-z0-9_-]{16,128}$/', $nonce)) {
             return ApiResponse::error('认证请求头无效或已过期', 401);
         }
         $application = PlatformApplication::query()->where('app_key', $key)->first();

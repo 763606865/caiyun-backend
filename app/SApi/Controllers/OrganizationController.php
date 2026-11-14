@@ -7,6 +7,7 @@ use App\SApi\Requests\PaginationRequest;
 use App\SApi\Requests\SaveOrganizationRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /** 中台组织管理接口。 */
 class OrganizationController extends Controller
@@ -110,7 +111,7 @@ class OrganizationController extends Controller
         $record = PlatformOrganization::query()->findOrFail($id);
 
         try {
-            $record->delete();
+            DB::transaction(fn () => $record->delete());
         } catch (QueryException $exception) {
             if (str_starts_with((string) $exception->getCode(), '23')) {
                 return $this->error('记录仍有关联数据，无法删除', 409);

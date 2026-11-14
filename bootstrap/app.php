@@ -1,5 +1,7 @@
 <?php
 
+use App\Admin\Commands\BindPlatformDirectory;
+use App\Admin\Commands\ConfigurePlatformIntegration;
 use App\Admin\Commands\CreateAdminUser;
 use App\Admin\Commands\DetectAbnormalLicenseHeartbeats;
 use App\Admin\Commands\GenerateLicenseKeys;
@@ -9,6 +11,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RecordClientContext;
 use App\OpenApi\Middleware\VerifyEncryptedOpenApiRequest;
 use App\SApi\Middleware\AuthenticateApplication;
+use App\SApi\Middleware\AuthorizeDirectory;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,12 +27,14 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function (): void {
-            Route::prefix('sapi')->middleware([AuthenticateApplication::class, 'throttle:120,1', SubstituteBindings::class])->group(base_path('routes/sapi.php'));
+            Route::prefix('sapi')->middleware([AuthenticateApplication::class, AuthorizeDirectory::class, 'throttle:120,1', SubstituteBindings::class])->group(base_path('routes/sapi.php'));
             Route::prefix('openapi')->group(base_path('routes/openapi.php'));
         },
     )
     ->withCommands([
         CreateAdminUser::class,
+        ConfigurePlatformIntegration::class,
+        BindPlatformDirectory::class,
         InstallCms::class,
         GenerateLicenseKeys::class,
         DetectAbnormalLicenseHeartbeats::class,

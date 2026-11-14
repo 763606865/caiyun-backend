@@ -7,6 +7,7 @@ use App\SApi\Requests\PaginationRequest;
 use App\SApi\Requests\SaveUserRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /** 中台用户管理接口。 */
@@ -105,7 +106,7 @@ class UserController extends Controller
         $record = User::query()->findOrFail($id);
 
         try {
-            $record->delete();
+            DB::transaction(fn () => $record->delete());
         } catch (QueryException $exception) {
             if (str_starts_with((string) $exception->getCode(), '23')) {
                 return $this->error('记录仍有关联数据，无法删除', 409);
