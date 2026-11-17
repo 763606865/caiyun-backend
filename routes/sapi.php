@@ -1,5 +1,6 @@
 <?php
 
+use App\SApi\Controllers\ContractApprovalController;
 use App\SApi\Controllers\DirectoryController;
 use App\SApi\Controllers\EmployeeController;
 use App\SApi\Controllers\EnterpriseController;
@@ -29,6 +30,14 @@ Route::get('directory/changes', [DirectoryController::class, 'changes']);
 Route::post('identity/resolve', [DirectoryController::class, 'resolve']);
 Route::post('auth/check', [IntegrationAuthController::class, 'check']);
 Route::post('auth/exchange', [IntegrationAuthController::class, 'exchange']);
+Route::post('auth/delegated-tickets', [IntegrationAuthController::class, 'delegate']);
+Route::prefix('integration/contract-approvals')->controller(ContractApprovalController::class)->group(function (): void {
+    Route::post('/', 'store');
+    Route::get('/', 'index');
+    Route::get('/{uuid}', 'show');
+    Route::post('/{uuid}/result', 'result');
+    Route::post('/{uuid}/cancel', 'cancel');
+});
 Route::get('integration/status', [IntegrationAuthController::class, 'status']);
 Route::middleware('auth:api')->group(function (): void {
     Route::put('enterprises/{enterpriseUuid}/application-grants/{applicationCode}', function (Request $request, string $enterpriseUuid, string $applicationCode) {

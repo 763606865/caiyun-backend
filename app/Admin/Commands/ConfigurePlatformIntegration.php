@@ -14,7 +14,7 @@ class ConfigurePlatformIntegration extends Command
 {
     use ReadsIntegrationOptions;
 
-    protected $signature = 'platform:integration {application : 已注册应用编码} {--enterprise= : 中台企业UUID} {--scope=* : directory.read/write、auth.check、subscription.read/write、grants.manage、directory.bootstrap、platform.admin} {--employment= : 任职UUID} {--grant : 开通企业或任职的应用权限} {--revoke : 撤销指定scope或应用授权} {--redirect-uri=* : 登录回跳白名单，传入时替换整份名单}';
+    protected $signature = 'platform:integration {application : 已注册应用编码} {--enterprise= : 中台企业UUID} {--scope=* : directory.read/write、auth.check/delegate、contracts.submit/receive、subscription.read/write、grants.manage、directory.bootstrap、platform.admin} {--employment= : 任职UUID} {--grant : 开通企业或任职的应用权限} {--revoke : 撤销指定scope或应用授权} {--redirect-uri=* : 登录回跳白名单，传入时替换整份名单}';
 
     protected $description = '按应用和企业显式配置中台接入权限与登录白名单';
 
@@ -29,7 +29,7 @@ class ConfigurePlatformIntegration extends Command
         $app = PlatformApplication::query()->where('code', $this->stringArgument('application'))->firstOrFail();
         $enterprise = $enterpriseUuid ? $access->enterprise($enterpriseUuid) : null;
         foreach ($scopes as $scope) {
-            if (! in_array($scope, ['directory.read', 'directory.write', 'auth.check', 'subscription.read', 'subscription.write', 'grants.manage', 'directory.bootstrap', 'platform.admin'], true)) {
+            if (! in_array($scope, ['directory.read', 'directory.write', 'auth.check', 'auth.delegate', 'contracts.submit', 'contracts.receive', 'subscription.read', 'subscription.write', 'grants.manage', 'directory.bootstrap', 'platform.admin'], true)) {
                 $this->error('未知 scope');
 
                 return self::FAILURE;

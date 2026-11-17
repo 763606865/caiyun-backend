@@ -42,6 +42,30 @@ class IntegrationAuthController extends Controller
         return $this->success(['code' => $code, 'expires_in' => 60, 'state' => $data['state']]);
     }
 
+    /** Only a scoped identity provider may delegate its authenticated local member. */
+    public function delegate(Request $request, IntegrationAccess $access): JsonResponse
+    {
+        $data = $request->validate(['enterprise_uuid' => 'required|uuid', 'user_uuid' => 'required|uuid',
+            'employment_uuid' => 'required|uuid', 'application_code' => 'required|string|max:50',
+            'redirect_uri' => 'required|url|max:1000', 'state' => 'required|string|size:64']);
+        $source = $request->attributes->get('sapi_application');
+        $enterprise = $access->enterprise($data['enterprise_uuid']);
+        $access->require($source, 'auth.delegate', $enterprise->id);
+        $identity = ['enterprise_uuid' => $enterprise->uuid, 'user_uuid' => $data['user_uuid'],
+            'employment_uuid' => $data['employment_uuid'], 'application_code' => $source->code];
+        abort_unless($access->check($source, $identity)['active'], 403, '来源应用身份已失效');
+        $target = PlatformApplication::query()->where('code', $data['application_code'])->where('is_enabled', true)->firstOrFail();
+        abort_unless(in_array($data['redirect_uri'], $target->redirect_uris ?? [], true), 422, '回跳地址未获授权');
+        abort_unless($access->check($target, [...$identity, 'application_code' => $target->code])['active'], 403, '目标应用未授权');
+        $employee = PlatformEmployee::query()->where('enterprise_id', $enterprise->id)->where('uuid', $data['employment_uuid'])->firstOrFail();
+        $code = Str::random(64);
+        DB::table('platform_login_tickets')->insert(['code_hash' => hash('sha256', $code), 'application_id' => $target->id,
+            'employee_id' => $employee->id, 'redirect_uri' => $data['redirect_uri'], 'state' => $data['state'], 'expires_at' => now()->addSeconds(60)]);
+        $access->audit($source, 'login.delegate', $enterprise->id, 200, $employee->user_id, $target->code);
+
+        return $this->success(['code' => $code, 'state' => $data['state'], 'redirect_uri' => $data['redirect_uri'], 'expires_in' => 60]);
+    }
+
     public function exchange(Request $request, IntegrationAccess $access): JsonResponse
     {
         $data = $request->validate(['code' => 'required|string|max:191', 'redirect_uri' => 'required|url|max:1000']);
