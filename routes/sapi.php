@@ -1,10 +1,12 @@
 <?php
 
+use App\SApi\Controllers\BusinessExchangeController;
 use App\SApi\Controllers\ContractApprovalController;
 use App\SApi\Controllers\DirectoryController;
 use App\SApi\Controllers\EmployeeController;
 use App\SApi\Controllers\EnterpriseController;
 use App\SApi\Controllers\IntegrationAuthController;
+use App\SApi\Controllers\MasterDataController;
 use App\SApi\Controllers\OrganizationController;
 use App\SApi\Controllers\PingController;
 use App\SApi\Controllers\SubscriptionController;
@@ -46,4 +48,16 @@ Route::middleware('auth:api')->group(function (): void {
     Route::put('enterprises/{enterpriseUuid}/employments/{employmentUuid}/application-grants/{applicationCode}', function (Request $request, string $enterpriseUuid, string $employmentUuid, string $applicationCode) {
         return app(IntegrationAuthController::class)->grant($request, $enterpriseUuid, $applicationCode, app(IntegrationAccess::class), $employmentUuid);
     });
+});
+
+Route::prefix('integration/masters')->controller(MasterDataController::class)->group(function (): void {
+    Route::post('/', 'store');
+    Route::get('/', 'index');
+    Route::post('/resolve', 'resolve');
+    Route::post('/{uuid}/bind', 'bind');
+});
+Route::prefix('integration/messages')->controller(BusinessExchangeController::class)->group(function (): void {
+    Route::post('/', 'store');
+    Route::get('/', 'index');
+    Route::post('/{uuid}/ack', 'ack');
 });
