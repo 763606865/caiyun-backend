@@ -18,13 +18,18 @@ class BusinessExchangeController extends Controller
     /**
      * @return array{PlatformApplication,PlatformEnterprise}
      */
-    public function authorizeApp(Request $request, string $enterpriseUuid, string $scope): array
+    public function authorizeApp(Request $request, string $enterpriseUuid, string $scope, bool $exactScope = false): array
     {
         $app = $request->attributes->get('sapi_application');
         $access = app(IntegrationAccess::class);
         $enterprise = $access->enterprise($enterpriseUuid);
         abort_unless($app instanceof PlatformApplication && $app->is_enabled && ! $app->expires_at?->isPast() && $enterprise->is_enabled, 403, '应用或企业不可用');
-        $access->require($app, $scope, $enterprise->id);
+        if ($exactScope) {
+            abort_unless(DB::table('platform_application_scopes')->where('application_id', $app->id)
+                ->where('enterprise_id', $enterprise->id)->where('scope', $scope)->exists(), 403, '应用未获该企业接口授权');
+        } else {
+            $access->require($app, $scope, $enterprise->id);
+        }
         abort_unless(DB::table('platform_application_grants')->where('application_id', $app->id)->where('enterprise_id', $enterprise->id)->where('employee_id', 0)->where('is_enabled', true)->exists(), 403, '企业未开通应用');
 
         return [$app, $enterprise];
@@ -57,9 +62,9 @@ class BusinessExchangeController extends Controller
 
     public function index(Request $r): JsonResponse
     {
-        $d = $r->validate(['enterprise_uuid' => 'required|uuid', 'kind' => ['required', Rule::in(self::KINDS)], 'after_id' => 'sometimes|integer|min:0']);
+        $d = $r->validate(['enterprise_uuid' => 'required|uuid', 'kind' => ['required', Rule::in(self::KINDS)], 'after_id' => 'sometimes|integer|min:0', 'uuid' => 'sometimes|uuid']);
         [$app,$enterprise] = $this->authorizeApp($r, $d['enterprise_uuid'], 'business.receive.'.$d['kind']);
-        $rows = DB::table('platform_business_messages')->select('platform_business_messages.*')->selectSub(PlatformApplication::query()->select('code')->whereColumn('id', 'platform_business_messages.source_application_id'), 'source_application_code')->where('target_application_id', $app->id)->where('enterprise_id', $enterprise->id)->where('kind', $d['kind'])->where('status', 'queued')->where('id', '>', $d['after_id'] ?? 0)->orderBy('id')->limit(100)->get();
+        $rows = DB::table('platform_business_messages')->select('platform_business_messages.*')->selectSub(PlatformApplication::query()->select('code')->whereColumn('id', 'platform_business_messages.source_application_id'), 'source_application_code')->where('target_application_id', $app->id)->where('enterprise_id', $enterprise->id)->where('kind', $d['kind'])->where('status', 'queued')->when(isset($d['uuid']), fn ($query) => $query->where('uuid', $d['uuid']))->where('id', '>', $d['after_id'] ?? 0)->orderBy('id')->limit(100)->get();
 
         return $this->success(['items' => $rows, 'next_id' => $rows->last()?->id, 'has_more' => $rows->count() === 100]);
     }

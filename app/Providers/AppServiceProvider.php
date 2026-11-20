@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Category;
 use App\Models\Content;
 use App\Models\Media;
+use App\Models\PlatformApplication;
 use App\Models\PlatformEmployee;
 use App\Models\PlatformEnterprise;
 use App\Models\PlatformOrganization;
@@ -14,8 +15,11 @@ use App\Models\User;
 use App\Observers\CmsAuditObserver;
 use App\Observers\PlatformDirectoryObserver;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -36,6 +40,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        RateLimiter::for('fulfillment', function (Request $request): Limit {
+            $application = $request->attributes->get('sapi_application');
+
+            return Limit::perMinute(120)->by($application instanceof PlatformApplication ? 'app:'.$application->id : 'ip:'.$request->ip());
+        });
         foreach ([PlatformEnterprise::class, PlatformOrganization::class, PlatformEmployee::class, User::class] as $model) {
             $model::observe(PlatformDirectoryObserver::class);
         }

@@ -34,7 +34,7 @@ class ConfigurePlatformIntegration extends Command
                 array_map(fn (string $kind): string => 'business.send.'.$kind, BusinessExchangeController::KINDS),
                 array_map(fn (string $kind): string => 'business.receive.'.$kind, BusinessExchangeController::KINDS),
             );
-            if (! in_array($scope, array_merge(['directory.read', 'directory.write', 'auth.check', 'auth.delegate', 'contracts.submit', 'contracts.receive', 'subscription.read', 'subscription.write', 'grants.manage', 'directory.bootstrap', 'platform.admin', 'masters.read', 'masters.bind', 'masters.write.customer', 'masters.write.unit', 'masters.write.product', 'masters.write.warehouse'], $businessScopes), true)) {
+            if (! in_array($scope, array_merge(['directory.read', 'directory.write', 'auth.check', 'auth.delegate', 'contracts.submit', 'contracts.receive', 'subscription.read', 'subscription.write', 'grants.manage', 'directory.bootstrap', 'platform.admin', 'masters.read', 'masters.bind', 'masters.write.customer', 'masters.write.unit', 'masters.write.product', 'masters.write.warehouse', 'fulfillment.observe', 'fulfillment.retry'], $businessScopes), true)) {
                 $this->error('未知 scope');
 
                 return self::FAILURE;

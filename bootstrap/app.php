@@ -1,6 +1,7 @@
 <?php
 
 use App\Admin\Commands\BindPlatformDirectory;
+use App\Admin\Commands\ConfigureFulfillmentOperator;
 use App\Admin\Commands\ConfigurePlatformIntegration;
 use App\Admin\Commands\CreateAdminUser;
 use App\Admin\Commands\DetectAbnormalLicenseHeartbeats;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         CreateAdminUser::class,
         ConfigurePlatformIntegration::class,
+        ConfigureFulfillmentOperator::class,
         BindPlatformDirectory::class,
         InstallCms::class,
         GenerateLicenseKeys::class,
