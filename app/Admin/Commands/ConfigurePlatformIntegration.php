@@ -5,6 +5,7 @@ namespace App\Admin\Commands;
 use App\Admin\Commands\Concerns\ReadsIntegrationOptions;
 use App\Models\PlatformApplication;
 use App\Models\PlatformEmployee;
+use App\SApi\Controllers\BusinessExchangeController;
 use App\Services\Platform\IntegrationAccess;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,11 @@ class ConfigurePlatformIntegration extends Command
         $app = PlatformApplication::query()->where('code', $this->stringArgument('application'))->firstOrFail();
         $enterprise = $enterpriseUuid ? $access->enterprise($enterpriseUuid) : null;
         foreach ($scopes as $scope) {
-            if (! in_array($scope, ['directory.read', 'directory.write', 'auth.check', 'auth.delegate', 'contracts.submit', 'contracts.receive', 'subscription.read', 'subscription.write', 'grants.manage', 'directory.bootstrap', 'platform.admin', 'masters.read', 'masters.bind', 'masters.write.customer', 'masters.write.unit', 'masters.write.product', 'masters.write.warehouse', 'business.send.sales_order', 'business.send.warehouse_delivery', 'business.send.delivery_result', 'business.send.order_status', 'business.send.cancel_sales_order', 'business.send.cancel_delivery', 'business.receive.sales_order', 'business.receive.warehouse_delivery', 'business.receive.delivery_result', 'business.receive.order_status', 'business.receive.cancel_sales_order', 'business.receive.cancel_delivery'], true)) {
+            $businessScopes = array_merge(
+                array_map(fn (string $kind): string => 'business.send.'.$kind, BusinessExchangeController::KINDS),
+                array_map(fn (string $kind): string => 'business.receive.'.$kind, BusinessExchangeController::KINDS),
+            );
+            if (! in_array($scope, array_merge(['directory.read', 'directory.write', 'auth.check', 'auth.delegate', 'contracts.submit', 'contracts.receive', 'subscription.read', 'subscription.write', 'grants.manage', 'directory.bootstrap', 'platform.admin', 'masters.read', 'masters.bind', 'masters.write.customer', 'masters.write.unit', 'masters.write.product', 'masters.write.warehouse'], $businessScopes), true)) {
                 $this->error('未知 scope');
 
                 return self::FAILURE;

@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 /** Durable, enterprise-scoped envelopes. Each business system retains its own write authority. */
 class BusinessExchangeController extends Controller
 {
-    public const KINDS = ['sales_order', 'warehouse_delivery', 'delivery_result', 'order_status', 'cancel_sales_order', 'cancel_delivery'];
+    public const KINDS = ['sales_order', 'warehouse_delivery', 'delivery_result', 'order_status', 'cancel_sales_order', 'cancel_delivery', 'production_order', 'production_result', 'warehouse_receipt', 'receipt_result'];
 
     /**
      * @return array{PlatformApplication,PlatformEnterprise}
