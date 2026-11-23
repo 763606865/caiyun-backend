@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('platform_fulfillment_operators', function (Blueprint $table): void {
+        $this->createTable('platform_fulfillment_operators', function (Blueprint $table): void {
             $table->foreignId('enterprise_id')->constrained('platform_enterprises')->cascadeOnDelete();
             $table->foreignId('admin_user_id')->constrained('admin_users')->cascadeOnDelete();
             $table->boolean('can_retry')->default(false);
@@ -16,7 +16,7 @@ return new class extends Migration
             $table->index('admin_user_id');
         });
 
-        Schema::create('platform_fulfillment_failures', function (Blueprint $table): void {
+        $this->createTable('platform_fulfillment_failures', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('enterprise_id')->constrained('platform_enterprises')->restrictOnDelete();
             $table->foreignId('application_id')->constrained('platform_applications')->restrictOnDelete();
@@ -29,10 +29,9 @@ return new class extends Migration
             $table->timestamp('next_attempt_at')->nullable();
             $table->timestamp('observed_at', 3);
             $table->unique(['enterprise_id', 'application_id', 'message_uuid', 'direction'], 'fulfillment_failure_identity');
-            $table->index(['enterprise_id', 'correlation_uuid']);
         });
 
-        Schema::create('platform_fulfillment_checks', function (Blueprint $table): void {
+        $this->createTable('platform_fulfillment_checks', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('enterprise_id')->constrained('platform_enterprises')->restrictOnDelete();
             $table->uuid('correlation_uuid');
@@ -46,11 +45,10 @@ return new class extends Migration
             $table->string('status', 16);
             $table->timestamp('status_since');
             $table->unique(['enterprise_id', 'kind', 'subject_uuid'], 'fulfillment_check_identity');
-            $table->index(['enterprise_id', 'correlation_uuid']);
             $table->index(['enterprise_id', 'status', 'status_since'], 'fulfillment_check_status');
         });
 
-        Schema::create('platform_fulfillment_retries', function (Blueprint $table): void {
+        $this->createTable('platform_fulfillment_retries', function (Blueprint $table): void {
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('enterprise_id')->constrained('platform_enterprises')->restrictOnDelete();
@@ -64,14 +62,31 @@ return new class extends Migration
             $table->timestamp('requested_at');
             $table->timestamp('finished_at')->nullable();
             $table->index(['enterprise_id', 'application_id', 'status', 'direction', 'kind'], 'fulfillment_retry_worker');
-            $table->index(['enterprise_id', 'message_uuid']);
-            $table->index(['enterprise_id', 'correlation_uuid']);
         });
 
-        Schema::table('platform_business_messages', function (Blueprint $table): void {
-            $table->index(['enterprise_id', 'status', 'created_at'], 'fulfillment_message_queue');
-            $table->index(['enterprise_id', 'correlation_uuid', 'kind'], 'fulfillment_message_trace');
-        });
+        // MySQL may have committed the tables before a failed index statement.
+        $this->addIndex('platform_fulfillment_failures', ['enterprise_id', 'correlation_uuid'], 'fulfillment_failure_root');
+        $this->addIndex('platform_fulfillment_checks', ['enterprise_id', 'correlation_uuid'], 'fulfillment_check_root');
+        $this->addIndex('platform_fulfillment_retries', ['enterprise_id', 'message_uuid'], 'fulfillment_retry_message');
+        $this->addIndex('platform_fulfillment_retries', ['enterprise_id', 'correlation_uuid'], 'fulfillment_retry_root');
+        $this->addIndex('platform_business_messages', ['enterprise_id', 'status', 'created_at'], 'fulfillment_message_queue');
+        $this->addIndex('platform_business_messages', ['enterprise_id', 'correlation_uuid', 'kind'], 'fulfillment_message_trace');
+    }
+
+    /** @param Closure(Blueprint): void $definition */
+    private function createTable(string $table, Closure $definition): void
+    {
+        if (! Schema::hasTable($table)) {
+            Schema::create($table, $definition);
+        }
+    }
+
+    /** @param list<string> $columns */
+    private function addIndex(string $table, array $columns, string $index): void
+    {
+        if (! Schema::hasIndex($table, $columns)) {
+            Schema::table($table, fn (Blueprint $blueprint) => $blueprint->index($columns, $index));
+        }
     }
 
     public function down(): void
